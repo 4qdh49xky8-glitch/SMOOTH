@@ -1,0 +1,21 @@
+{
+  "name": "sold-out",
+  "description": "La vente ouvre mais tout est complet : aucune offre achetable.",
+  "saleOpensAfterMs": 300,
+  "latencyMs": {
+    "fetchSale": 5,
+    "selectOffer": 20,
+    "addToCart": 40,
+    "readCart": 5
+  },
+  "humanResolveMs": 150,
+  "maxWaitMs": 1200,
+  "offers": [],
+  "soldOut": true,
+  "expect": {
+    "status": "sale-timeout",
+    "finalState": "SOLD_OUT",
+    "failureReason": "NO_MATCHING_OFFER",
+    "attempts": 0
+  }
+}

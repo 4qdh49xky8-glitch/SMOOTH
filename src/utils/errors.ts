@@ -27,7 +27,7 @@ export class NotLoggedInError extends Error {
 /** File d'attente, CAPTCHA, contrôle anti-bot : seul un humain peut poursuivre. */
 export class BlockerError extends Error {
   constructor(public readonly blocker: Blocker) {
-    super(`Blocage détecté (${blocker.kind}) : ${blocker.message}`);
+    super(`Blocage détecté (${blocker.state}) : ${blocker.message}`);
     this.name = "BlockerError";
   }
 }
@@ -44,5 +44,13 @@ export class StopRunError extends Error {
   constructor(public readonly blocker: Blocker) {
     super(`Arrêt : ${blocker.message}`);
     this.name = "StopRunError";
+  }
+}
+
+/** Une action humaine est nécessaire mais impossible (navigateur headless). */
+export class HumanRequiredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "HumanRequiredError";
   }
 }

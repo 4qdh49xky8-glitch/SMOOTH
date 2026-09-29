@@ -1,6 +1,7 @@
 import type { BrowserContext, Page } from "playwright";
 import type { BotConfig } from "../config/schema.js";
 import type { SelectorResolver } from "../selectors/resolver.js";
+import type { BlockingState } from "../agent/states.js";
 import type { Logger } from "../utils/logger.js";
 
 /** Offre normalisée : c'est le seul format que comprend le moteur de décision. */
@@ -23,6 +24,8 @@ export interface Offer {
 export interface SaleSnapshot {
   open: boolean;
   offers: Offer[];
+  /** Le site indique explicitement « complet / épuisé » (sinon déduit : aucune offre achetable). */
+  soldOut?: boolean;
 }
 
 export interface CartSummary {
@@ -35,27 +38,15 @@ export interface CartSummary {
 }
 
 /**
- * État « bloquant » remonté au cœur. Le cœur ne contourne JAMAIS aucun de ces états :
- *  - captcha | queue | anti-bot      : cession de la main à l'humain, reprise auto quand ça disparaît ;
- *  - login-required | human-step     : cession de la main, reprise quand l'humain confirme (Entrée) ;
- *  - purchase-limit                  : ARRÊT DÉFINITIF du run (limite d'achat du site, jamais contournée).
+ * État « bloquant » remonté au cœur (voir src/agent/states.ts). Le cœur ne contourne JAMAIS aucun de ces états :
+ *  - CAPTCHA | QUEUE | BLOCKED          : cession de la main à l'humain, reprise auto quand ça disparaît ;
+ *  - LOGIN_REQUIRED | MANUAL_SELECTION  : cession de la main, reprise quand l'humain confirme (Entrée) ;
+ *  - PURCHASE_LIMIT                     : ARRÊT DÉFINITIF du run (limite d'achat du site, jamais contournée).
  */
-export type BlockerKind =
-  | "captcha"
-  | "queue"
-  | "anti-bot"
-  | "login-required"
-  | "human-step"
-  | "purchase-limit"
-  | "unknown";
-
 export interface Blocker {
-  kind: BlockerKind;
+  state: BlockingState;
   message: string;
 }
-
-/** Blocages dont la disparition peut être détectée automatiquement sur la page. */
-export const AUTO_DETECTABLE: readonly BlockerKind[] = ["captcha", "queue", "anti-bot"];
 
 /**
  * Cadre juridique de l'adaptateur. Le cœur REFUSE de lancer un adaptateur sans déclaration valide
@@ -136,7 +127,7 @@ export interface SiteAdapter {
 
   /**
    * Optionnel — choix des places après selectOffer. Si le choix doit être fait par l'humain
-   * (plan de salle), lever BlockerError({kind:"human-step"}) : le cœur cède la main puis continue.
+   * (plan de salle), lever BlockerError({ state: "MANUAL_SELECTION", … }) : le cœur cède la main puis continue.
    */
   selectSeats?(ctx: AdapterContext, offer: Offer, quantity: number): Promise<void>;
 
@@ -144,6 +135,9 @@ export interface SiteAdapter {
   addToCart(ctx: AdapterContext): Promise<void>;
 
   readCart(ctx: AdapterContext): Promise<CartSummary>;
+
+  /** Valide `siteOptions` de la config ; retourne des messages d'erreur (vide = OK). Utilisé par `npm run validate`. */
+  validateOptions?(options: Record<string, unknown>): string[];
 
   /** Lecture seule de la page : file d'attente, CAPTCHA, anti-bot, limite d'achat, session expirée. */
   detectBlocker(ctx: AdapterContext): Promise<Blocker | null>;

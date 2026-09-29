@@ -1,0 +1,32 @@
+{
+  "site": "example",
+  "behavior": {
+    "autoAddToCart": true,
+    "autoPayment": false
+  },
+  "timing": {
+    "preArmSeconds": 90,
+    "pollIntervalMs": 400,
+    "maxWaitAfterSaleSeconds": 900
+  },
+  "browser": {
+    "headless": false,
+    "userDataDir": ".profile",
+    "debugPort": 9222,
+    "blockHeavyResources": true
+  },
+  "claude": {
+    "enabled": false
+  },
+  "notifications": {
+    "desktop": true,
+    "sound": true
+  },
+  "telemetry": {
+    "enabled": true,
+    "dir": "runs"
+  },
+  "logging": {
+    "level": "info"
+  }
+}

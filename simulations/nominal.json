@@ -1,0 +1,103 @@
+{
+  "name": "nominal",
+  "description": "Cas nominal : la meilleure offre (Catégorie 2, côte à côte, sous le budget) est mise au panier.",
+  "saleOpensAfterMs": 300,
+  "latencyMs": {
+    "fetchSale": 5,
+    "selectOffer": 20,
+    "addToCart": 40,
+    "readCart": 5
+  },
+  "humanResolveMs": 150,
+  "maxWaitMs": 3000,
+  "offers": [
+    {
+      "id": "o1",
+      "category": "Catégorie 1",
+      "price": 189,
+      "available": 4,
+      "section": "A",
+      "row": "3",
+      "seats": [
+        "11",
+        "12",
+        "13",
+        "14"
+      ]
+    },
+    {
+      "id": "o2",
+      "category": "Catégorie 2",
+      "price": 139,
+      "available": 2,
+      "section": "B",
+      "row": "7",
+      "seats": [
+        "5",
+        "6"
+      ]
+    },
+    {
+      "id": "o3",
+      "category": "Catégorie 2",
+      "price": 129,
+      "available": 2,
+      "section": "B",
+      "row": "9",
+      "seats": [
+        "8",
+        "20"
+      ]
+    },
+    {
+      "id": "o4",
+      "category": "Catégorie 3",
+      "price": 99,
+      "available": 1,
+      "section": "C",
+      "row": "2",
+      "seats": [
+        "4"
+      ]
+    },
+    {
+      "id": "o5",
+      "category": "Catégorie 4",
+      "price": 79,
+      "available": 6,
+      "section": "D",
+      "row": "1",
+      "seats": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6"
+      ]
+    },
+    {
+      "id": "o6",
+      "category": "Catégorie 3",
+      "price": 120,
+      "available": 2,
+      "section": "C",
+      "row": "5",
+      "seats": [
+        "30",
+        "31"
+      ]
+    }
+  ],
+  "expect": {
+    "status": "in-cart",
+    "finalState": "CART_SUCCESS",
+    "attempts": 1,
+    "humanHandoffs": 0,
+    "offerId": "o2",
+    "statesInclude": [
+      "AVAILABLE",
+      "CART_SUCCESS"
+    ]
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "extends": "_base.json",
+  "event": {
+    "name": "Match (exemple)",
+    "date": "2027-03-20",
+    "url": "http://127.0.0.1:4173/event"
+  },
+  "sale": {
+    "startTime": "2026-12-05T09:00:00+01:00"
+  },
+  "tickets": {
+    "quantity": 2,
+    "maxPricePerTicket": 120,
+    "categories": [
+      "Tribune Nord",
+      "Tribune Sud",
+      "Tribune Est"
+    ],
+    "seatsTogether": true
+  },
+  "strategy": {
+    "priority": [
+      "category",
+      "seatsTogether",
+      "placement",
+      "price"
+    ],
+    "priorityCategories": [
+      "Tribune Nord"
+    ],
+    "placement": {
+      "avoidSections": [
+        "Vue limitée"
+      ],
+      "excludeSections": [
+        "Visiteurs"
+      ],
+      "rowPreference": "front"
+    }
+  }
+}

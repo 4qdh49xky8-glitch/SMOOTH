@@ -1,121 +1,103 @@
 import "dotenv/config";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
-import { Agent } from "./agent/Agent.js";
-import { ClaudeAssistant } from "./agent/claude.js";
-import { installPaymentGuard } from "./browser/guards.js";
-import { traceSlowRequests, tuneNetwork } from "./browser/cdp.js";
-import { openBrowser } from "./browser/launch.js";
-import { loadConfig } from "./config/load.js";
-import { SelectorResolver } from "./selectors/resolver.js";
-import { assertCompliant } from "./sites/compliance.js";
-import { discoverAdapters, getAdapter } from "./sites/registry.js";
-import type { AdapterContext } from "./sites/SiteAdapter.js";
-import { Clock } from "./utils/clock.js";
-import { createLogger } from "./utils/logger.js";
-import { waitForEnter } from "./utils/prompt.js";
+import { liveCommand } from "./cli/live.js";
+import { simulateCommand } from "./cli/simulate.js";
+import { sitesCommand } from "./cli/sites.js";
+import { statsCommand } from "./cli/stats.js";
+import { validateCommand } from "./cli/validate.js";
+import { listProfiles, PROFILES_DIR } from "./config/load.js";
+import { validateConfig } from "./config/validate.js";
+import { createLogger, parseLogLevel } from "./utils/logger.js";
 
-const USAGE = `Usage : tsx src/index.ts <commande> [--config config/event.json] [--trace] [--exit-when-done]
-  run     Lance l'agent (attend l'ouverture, met au panier, s'arrête)
-  login   Ouvre le navigateur sur le site pour vous connecter à la main (profil conservé)
-  check   Valide la config, la conformité de l'adaptateur et mesure le décalage d'horloge
-  (option) --list-sites   Liste les adaptateurs découverts dans src/sites/`;
+const USAGE = `Usage : npm run <commande> -- [options]   (ou : tsx src/index.ts <commande> [options])
 
-export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
+Adaptateurs et configuration
+  sites                          Liste les adaptateurs, leur base d'autorisation et l'état du contrat   (npm run sites)
+  validate [fichier|profil]      Valide une configuration sans contacter aucun site                    (npm run validate -- config/event.json)
+  validate --all                 Valide tous les profils de ${PROFILES_DIR}/
+  profiles                       Liste les profils disponibles
+
+Exécution
+  run                            Attend l'ouverture, met au panier, notifie, s'arrête avant le paiement (npm start)
+  login                          Ouvre le navigateur pour vous connecter à la main (profil conservé)
+  check                          Valide la config, la conformité et mesure l'horloge du site
+  simulate                       Rejoue le vrai cœur contre un faux site (aucun réseau)                  (npm run simulate)
+  stats                          Agrégats de la télémétrie locale
+
+Options : --config <fichier> | --profile <nom>   --log-level error|warn|info|debug   --log-file <fichier>
+          --scenario <nom> | --all   --start-in <ms>   --json   --trace   --exit-when-done   --dir <runs>`;
+
+export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
   const { positionals, values } = parseArgs({
     args: argv,
     allowPositionals: true,
     options: {
-      config: { type: "string", default: "config/event.json" },
+      config: { type: "string" },
+      profile: { type: "string" },
+      "log-level": { type: "string" },
+      "log-file": { type: "string" },
+      scenario: { type: "string" },
+      "start-in": { type: "string" },
+      dir: { type: "string", default: "runs" },
+      all: { type: "boolean", default: false },
+      json: { type: "boolean", default: false },
       trace: { type: "boolean", default: false },
       "exit-when-done": { type: "boolean", default: false },
-      "list-sites": { type: "boolean", default: false },
+      mode: { type: "string" },
     },
   });
-  const command = positionals[0];
-  if (values["list-sites"]) {
-    for (const a of await discoverAdapters()) {
-      const c = a.meta.compliance;
-      console.log(`${a.meta.id.padEnd(14)} ${a.meta.displayName} — ${c.policy}, CGU relues le ${c.reviewedAt}`);
+  const [command, arg] = positionals;
+  const target = values.config ?? values.profile ?? arg;
+
+  switch (command) {
+    case "sites":
+      return sitesCommand({ json: values.json });
+    case "validate":
+      return validateCommand(target, { all: values.all, json: values.json });
+    case "profiles": {
+      const names = listProfiles();
+      for (const n of names) {
+        const r = await validateConfig(n);
+        console.log(`${r.ok ? "✓" : "✗"} ${n.padEnd(12)} ${r.config ? `${r.config.event.name} — site « ${r.config.site} »` : r.errors[0]}`);
+      }
+      if (!names.length) console.log(`Aucun profil dans ${PROFILES_DIR}/`);
+      return 0;
     }
-    return;
-  }
-  if (!command || !["run", "login", "check"].includes(command)) {
-    console.log(USAGE);
-    process.exit(command ? 1 : 0);
-  }
-
-  const log = createLogger();
-  const config = loadConfig(values.config!);
-  const adapter = await getAdapter(config.site);
-  assertCompliant(adapter.meta, adapter.resolveEventUrl(config)); // refus AVANT d'ouvrir le navigateur
-  const session = await openBrowser(config, log);
-  const ctx: AdapterContext = {
-    config,
-    context: session.context,
-    page: session.page,
-    log,
-    env: process.env,
-    selectors: new SelectorResolver(adapter.meta.id),
-  };
-
-  if (command === "login") {
-    await session.page.goto(adapter.resolveEventUrl(config));
-    log.info("Connectez-vous dans la fenêtre. Le profil (cookies) est conservé pour les prochains runs.");
-    await waitForEnter("Appuyez sur Entrée quand vous êtes connecté.").promise;
-    await session.detach();
-    return;
-  }
-
-  if (command === "check") {
-    const { estimateOffset } = await import("./utils/clock.js");
-    log.info(`Configuration valide. Ouverture : ${config.sale.startTime} (dans ${((Date.parse(config.sale.startTime) - Date.now()) / 60000).toFixed(1)} min)`);
-    log.info(`Adaptateur « ${adapter.meta.displayName} » — capacités : ${JSON.stringify(adapter.meta.capabilities)}`);
-    if (adapter.getServerTime) {
-      const est = await estimateOffset(() => adapter.getServerTime!(ctx));
-      log.info(`Décalage d'horloge serveur : ${est.offsetMs.toFixed(1)} ms, RTT min ${est.rttMs.toFixed(1)} ms`);
-    } else {
-      log.info("Cet adaptateur n'expose pas d'heure serveur précise (repli sur l'en-tête Date, ±500 ms).");
-    }
-    await session.detach();
-    return;
-  }
-
-  // run
-  const releaseGuard = await installPaymentGuard(session.context, adapter.paymentUrlPatterns, log, () => undefined);
-  const tuning = await tuneNetwork(session.context, session.page, config.browser, log);
-  if (values.trace) traceSlowRequests(session.page, log);
-
-  const agent = new Agent({
-    config,
-    adapter,
-    ctx,
-    claude: new ClaudeAssistant(config.claude, log),
-    log,
-    clock: new Clock(),
-    onFinish: async () => {
-      await releaseGuard(); // le paiement manuel redevient possible
-      await tuning.release(); // images/polices de nouveau chargées
-    },
-  });
-
-  try {
-    const result = await agent.run();
-    if (result.status === "in-cart" || result.status === "ready-not-added") {
-      log.info("Le navigateur reste ouvert : vérifiez le panier et payez vous-même. Le bot s'arrête ici.");
-    }
-    if (values["exit-when-done"]) await session.shutdown();
-    else await session.detach();
-  } catch (err) {
-    log.error((err as Error).message);
-    await session.detach();
-    process.exitCode = 1;
+    case "simulate":
+      return simulateCommand({
+        target,
+        scenario: values.scenario,
+        all: values.all,
+        startInMs: values["start-in"] ? Number(values["start-in"]) : undefined,
+        log: createLogger({ level: parseLogLevel(values["log-level"]), file: values["log-file"] }),
+        telemetryDir: values.dir === "runs" ? undefined : values.dir,
+      });
+    case "stats":
+      return statsCommand(values.dir, { json: values.json, mode: values.mode });
+    case "run":
+    case "login":
+    case "check":
+      return liveCommand({
+        command,
+        target,
+        trace: values.trace,
+        exitWhenDone: values["exit-when-done"],
+        logLevel: values["log-level"],
+        logFile: values["log-file"],
+      });
+    default:
+      console.log(USAGE);
+      return command ? 1 : 0;
   }
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  main().catch((err) => {
-    console.error((err as Error).message);
-    process.exit(1);
-  });
+  main().then(
+    (code) => process.exit(code),
+    (err) => {
+      console.error((err as Error).message);
+      process.exit(1);
+    },
+  );
 }

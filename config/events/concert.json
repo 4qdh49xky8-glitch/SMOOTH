@@ -1,0 +1,29 @@
+{
+  "extends": "_base.json",
+  "event": {
+    "name": "Concert (exemple)",
+    "date": "2026-12-01",
+    "url": "http://127.0.0.1:4173/event"
+  },
+  "sale": {
+    "startTime": "2026-10-01T10:00:00+02:00"
+  },
+  "tickets": {
+    "quantity": 2,
+    "maxPricePerTicket": 150,
+    "categories": [
+      "Catégorie 1",
+      "Catégorie 2",
+      "Catégorie 3"
+    ],
+    "seatsTogether": true
+  },
+  "strategy": {
+    "priority": [
+      "seatsTogether",
+      "category",
+      "price"
+    ],
+    "priceOrder": "cheapest"
+  }
+}

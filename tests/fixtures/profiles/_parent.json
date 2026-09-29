@@ -1,0 +1,6 @@
+{
+  "site": "example",
+  "timing": { "pollIntervalMs": 500, "maxWaitAfterSaleSeconds": 100 },
+  "tickets": { "quantity": 2, "maxPricePerTicket": 100, "categories": ["A", "B"] },
+  "notifications": { "desktop": false, "sound": false }
+}

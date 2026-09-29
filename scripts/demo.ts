@@ -34,7 +34,8 @@ process.env.EXAMPLE_PASSWORD = "demo";
 
 console.log(`Site démo ${demo.url} — ouverture dans ~${openInSec}s\n`);
 const { main } = await import("../src/index.js");
-await main(["run", "--config", configPath, "--exit-when-done", "--trace"]);
+const code = await main(["run", "--config", configPath, "--exit-when-done", "--trace"]);
+if (code !== 0) console.log(`(code de sortie du bot : ${code})`);
 const cart = demo.state.cart;
 const expected = cart.length === 1 && cart[0]!.offerId === "o6" && cart[0]!.quantity === 2 && demo.state.addAttempts === 2;
 console.log(`\nÉtat du panier côté serveur : ${JSON.stringify(cart)} (tentatives d'ajout : ${demo.state.addAttempts})`);

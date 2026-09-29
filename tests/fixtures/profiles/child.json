@@ -1,0 +1,7 @@
+{
+  "extends": "_parent.json",
+  "event": { "name": "Enfant", "url": "http://127.0.0.1:4173/event" },
+  "sale": { "startTime": "2030-01-01T10:00:00+01:00" },
+  "tickets": { "categories": ["C"] },
+  "timing": { "pollIntervalMs": 300 }
+}

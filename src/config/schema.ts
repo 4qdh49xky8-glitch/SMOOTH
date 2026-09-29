@@ -14,7 +14,45 @@ export const TicketsSchema = z.object({
   seatsTogetherStrict: z.boolean().default(false),
 });
 
+export const CRITERIA = ["seatsTogether", "category", "placement", "price", "fit"] as const;
+export type Criterion = (typeof CRITERIA)[number];
+
+/**
+ * Stratégie de classement des offres (après filtrage par `tickets`). Tout est optionnel :
+ * sans bloc `strategy`, l'ordre est : côte à côte → catégorie (ordre de tickets.categories) → prix croissant.
+ */
+export const StrategySchema = z.object({
+  /**
+   * Ordre de priorité des critères (le 1er l'emporte). Un critère absent de la liste est ignoré.
+   *  seatsTogether : places côte à côte d'abord (si tickets.seatsTogether)
+   *  category      : ordre priorityCategories puis tickets.categories
+   *  placement     : sections préférées/évitées puis rang (avant/arrière)
+   *  price         : selon priceOrder
+   *  fit           : l'offre dont la quantité disponible colle le mieux (évite de laisser des places orphelines)
+   */
+  priority: z
+    .array(z.enum(CRITERIA))
+    .min(1)
+    .refine((a) => new Set(a).size === a.length, "critères en double")
+    .default(["seatsTogether", "category", "placement", "price"]),
+  priceOrder: z.enum(["cheapest", "most-expensive"]).default("cheapest"),
+  /** Catégories à tenter avant les autres catégories acceptées (dans cet ordre). */
+  priorityCategories: z.array(z.string().min(1)).default([]),
+  placement: z
+    .object({
+      preferSections: z.array(z.string().min(1)).default([]),
+      avoidSections: z.array(z.string().min(1)).default([]),
+      /** Offres exclues d'office si leur section correspond. */
+      excludeSections: z.array(z.string().min(1)).default([]),
+      rowPreference: z.enum(["front", "back", "any"]).default("any"),
+    })
+    .default({}),
+});
+export type Strategy = z.infer<typeof StrategySchema>;
+
 export const ConfigSchema = z.object({
+  /** Profil parent (chemin relatif) dont on hérite ; résolu par le chargeur. */
+  extends: z.string().optional(),
   /** Identifiant d'un adaptateur présent dans src/sites/ (voir `npm run check -- --list-sites`). */
   site: z.string().min(1),
   /** Réglages propres à l'adaptateur (libres, validés par l'adaptateur lui-même). */
@@ -31,6 +69,7 @@ export const ConfigSchema = z.object({
     startTime: z.string().refine(isoWithOffset, "Format ISO 8601 avec fuseau horaire requis"),
   }),
   tickets: TicketsSchema,
+  strategy: StrategySchema.default({}),
   behavior: z
     .object({
       autoAddToCart: z.boolean().default(true),
@@ -84,6 +123,19 @@ export const ConfigSchema = z.object({
     .object({
       desktop: z.boolean().default(true),
       sound: z.boolean().default(true),
+    })
+    .default({}),
+  /** Télémétrie locale (aucune donnée envoyée, aucune donnée personnelle). */
+  telemetry: z
+    .object({
+      enabled: z.boolean().default(true),
+      dir: z.string().default("runs"),
+    })
+    .default({}),
+  logging: z
+    .object({
+      level: z.enum(["error", "warn", "info", "debug"]).default("info"),
+      file: z.string().optional(),
     })
     .default({}),
 });

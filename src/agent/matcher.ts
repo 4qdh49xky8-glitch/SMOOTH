@@ -1,4 +1,4 @@
-import type { TicketCriteria } from "../config/schema.js";
+import { StrategySchema, type Criterion, type Strategy, type TicketCriteria } from "../config/schema.js";
 import type { CartSummary, Offer } from "../sites/SiteAdapter.js";
 
 export const normalize = (s: string): string =>
@@ -9,29 +9,75 @@ export const normalize = (s: string): string =>
     .replace(/\s+/g, " ")
     .trim();
 
-type Criteria = TicketCriteria;
+export const DEFAULT_STRATEGY: Strategy = StrategySchema.parse({});
+
+const matchesAny = (value: string | undefined, patterns: string[]): boolean => {
+  if (!value) return false;
+  const v = normalize(value);
+  return patterns.some((p) => v.includes(normalize(p)));
+};
 
 /**
- * Filtre puis classe les offres. 100 % déterministe (aucun appel LLM).
- * Ordre : côte à côte d'abord (si demandé) → ordre des catégories du fichier → prix croissant.
+ * Clés de tri par critère (plus petit = meilleur), comparées lexicographiquement.
+ * 100 % déterministe (aucun appel LLM).
  */
-export function rankOffers(offers: Offer[], c: Criteria): Offer[] {
-  const wanted = c.categories.map(normalize);
-  const togetherRank = (o: Offer): number => (o.seatsTogether === true ? 0 : o.seatsTogether === "unknown" ? 1 : 2);
+function criterionKey(c: Criterion, o: Offer, t: TicketCriteria, s: Strategy): number[] {
+  switch (c) {
+    case "seatsTogether":
+      if (!t.seatsTogether) return [0];
+      return [o.seatsTogether === true ? 0 : o.seatsTogether === "unknown" ? 1 : 2];
+    case "category": {
+      const cat = normalize(o.category);
+      const prio = s.priorityCategories.map(normalize);
+      const accepted = t.categories.map(normalize);
+      const pi = prio.indexOf(cat);
+      if (pi >= 0) return [pi];
+      const ai = accepted.indexOf(cat);
+      return [prio.length + (ai >= 0 ? ai : 0)];
+    }
+    case "placement": {
+      const p = s.placement;
+      const section = matchesAny(o.section, p.preferSections) ? 0 : matchesAny(o.section, p.avoidSections) ? 2 : 1;
+      const rowNum = Number.parseInt(o.row ?? "", 10);
+      const row = p.rowPreference === "any" || Number.isNaN(rowNum) ? Number.MAX_SAFE_INTEGER : p.rowPreference === "front" ? rowNum : -rowNum;
+      return [section, row];
+    }
+    case "price":
+      return [s.priceOrder === "cheapest" ? o.pricePerTicket : -o.pricePerTicket];
+    case "fit":
+      return [o.available - t.quantity];
+  }
+}
 
+const compareKeys = (a: number[], b: number[]): number => {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const d = (a[i] ?? 0) - (b[i] ?? 0);
+    if (d) return d;
+  }
+  return 0;
+};
+
+/** Filtre (contraintes dures de `tickets`) puis classe selon `strategy`. */
+export function rankOffers(offers: Offer[], t: TicketCriteria, strategy: Strategy = DEFAULT_STRATEGY): Offer[] {
+  const wanted = t.categories.map(normalize);
   return offers
-    .filter((o) => o.available >= c.quantity)
-    .filter((o) => o.pricePerTicket <= c.maxPricePerTicket)
+    .filter((o) => o.available >= t.quantity)
+    .filter((o) => o.pricePerTicket <= t.maxPricePerTicket)
     .filter((o) => wanted.length === 0 || wanted.includes(normalize(o.category)))
-    .filter((o) => !(c.seatsTogether && c.seatsTogetherStrict) || o.seatsTogether === true)
+    .filter((o) => !matchesAny(o.section, strategy.placement.excludeSections))
+    .filter((o) => !(t.seatsTogether && t.seatsTogetherStrict) || o.seatsTogether === true)
     .sort((a, b) => {
-      if (c.seatsTogether) {
-        const d = togetherRank(a) - togetherRank(b);
+      for (const c of strategy.priority) {
+        const d = compareKeys(criterionKey(c, a, t, strategy), criterionKey(c, b, t, strategy));
         if (d) return d;
       }
-      const cat = wanted.length ? wanted.indexOf(normalize(a.category)) - wanted.indexOf(normalize(b.category)) : 0;
-      return cat || a.pricePerTicket - b.pricePerTicket;
+      return a.pricePerTicket - b.pricePerTicket || a.id.localeCompare(b.id); // départage stable
     });
+}
+
+/** Détail des clés de tri d'une offre (journal DEBUG, `validate`). */
+export function explainOffer(o: Offer, t: TicketCriteria, strategy: Strategy = DEFAULT_STRATEGY): string {
+  return strategy.priority.map((c) => `${c}=${criterionKey(c, o, t, strategy).map((n) => (Math.abs(n) > 1e9 ? "∅" : n)).join("/")}`).join(" ");
 }
 
 /** Des numéros de sièges forment-ils une suite contiguë de `quantity` places ? */
@@ -48,7 +94,7 @@ export function seatsAreContiguous(seats: string[] | undefined, quantity: number
   return quantity <= 1;
 }
 
-export function verifyCart(cart: CartSummary, c: Criteria): { ok: boolean; problems: string[] } {
+export function verifyCart(cart: CartSummary, c: TicketCriteria): { ok: boolean; problems: string[] } {
   const problems: string[] = [];
   if (cart.itemCount !== c.quantity) problems.push(`quantité ${cart.itemCount} ≠ ${c.quantity} demandée`);
   for (const it of cart.items) {

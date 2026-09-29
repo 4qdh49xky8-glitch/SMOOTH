@@ -1,0 +1,24 @@
+{
+  "extends": "_base.json",
+  "event": {
+    "name": "Festival (exemple)",
+    "date": "2027-07-10",
+    "url": "http://127.0.0.1:4173/event"
+  },
+  "sale": {
+    "startTime": "2026-11-15T12:00:00+01:00"
+  },
+  "tickets": {
+    "quantity": 4,
+    "maxPricePerTicket": 90,
+    "categories": [],
+    "seatsTogether": false
+  },
+  "strategy": {
+    "priority": [
+      "price",
+      "fit"
+    ],
+    "priceOrder": "cheapest"
+  }
+}

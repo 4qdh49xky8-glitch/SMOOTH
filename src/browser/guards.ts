@@ -12,7 +12,9 @@ export async function installPaymentGuard(
   onBlocked: (url: string) => void,
 ): Promise<() => Promise<void>> {
   const handler = (route: import("playwright").Route): Promise<void> => {
-    log.warn(`Garde-fou : accès à une page de paiement bloqué (${route.request().url()})`);
+    // Hôte + chemin seulement : jamais les paramètres d'URL (jetons, identifiants de session…).
+    const u = new URL(route.request().url());
+    log.warn(`Garde-fou : accès à une page de paiement bloqué (${u.origin}${u.pathname})`);
     onBlocked(route.request().url());
     return route.abort();
   };

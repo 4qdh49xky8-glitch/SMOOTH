@@ -1,0 +1,36 @@
+{
+  "extends": "_base.json",
+  "event": {
+    "name": "Spectacle (exemple)",
+    "date": "2027-01-22",
+    "url": "http://127.0.0.1:4173/event"
+  },
+  "sale": {
+    "startTime": "2026-10-20T10:00:00+02:00"
+  },
+  "tickets": {
+    "quantity": 2,
+    "maxPricePerTicket": 80,
+    "categories": [
+      "Orchestre",
+      "Balcon"
+    ],
+    "seatsTogether": true,
+    "seatsTogetherStrict": true
+  },
+  "strategy": {
+    "priority": [
+      "seatsTogether",
+      "category",
+      "placement",
+      "price"
+    ],
+    "priceOrder": "most-expensive",
+    "placement": {
+      "preferSections": [
+        "Orchestre centre"
+      ],
+      "rowPreference": "front"
+    }
+  }
+}
