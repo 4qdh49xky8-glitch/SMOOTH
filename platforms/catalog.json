@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 1,
-  "note": "Catalogue interne. Aucune plateforme n'est autorisée tant qu'une preuve officielle datée n'est pas consignée (voir docs/PLATFORMS.md). Les « clues » sont des pistes NON vérifiées.",
+  "schemaVersion": 2,
+  "note": "Données STATIQUES des plateformes candidates. Aucune autorisation ici : elles se déduisent exclusivement des preuves officielles de platforms/evidence/*.json (voir docs/PLATFORMS.md). Les « clues » sont des pistes NON vérifiées.",
   "platforms": [
     {
       "id": "axs",
@@ -21,25 +21,6 @@
         "support.axs.com",
         "axssupportuk.axs.com"
       ],
-      "verification": {
-        "status": "NON_VERIFIE",
-        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
-      },
-      "officialApi": {
-        "status": "unknown"
-      },
-      "automation": {
-        "status": "unknown"
-      },
-      "queue": {
-        "status": "unknown"
-      },
-      "purchaseLimits": {
-        "status": "unknown"
-      },
-      "cart": {
-        "status": "unknown"
-      },
       "clues": [
         {
           "url": "https://www.axs.com/about-terms-of-use_US_v1.html",
@@ -68,25 +49,6 @@
       "officialHosts": [
         "billetreduc.com"
       ],
-      "verification": {
-        "status": "NON_VERIFIE",
-        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
-      },
-      "officialApi": {
-        "status": "unknown"
-      },
-      "automation": {
-        "status": "unknown"
-      },
-      "queue": {
-        "status": "unknown"
-      },
-      "purchaseLimits": {
-        "status": "unknown"
-      },
-      "cart": {
-        "status": "unknown"
-      },
       "clues": []
     },
     {
@@ -106,25 +68,6 @@
         "blog.billetweb.fr",
         "aide.billetweb.fr"
       ],
-      "verification": {
-        "status": "NON_VERIFIE",
-        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
-      },
-      "officialApi": {
-        "status": "unknown"
-      },
-      "automation": {
-        "status": "unknown"
-      },
-      "queue": {
-        "status": "unknown"
-      },
-      "purchaseLimits": {
-        "status": "unknown"
-      },
-      "cart": {
-        "status": "unknown"
-      },
       "clues": [
         {
           "url": "https://www.billetweb.fr/bo/api.php",
@@ -153,25 +96,6 @@
       "officialHosts": [
         "comedie-francaise.fr"
       ],
-      "verification": {
-        "status": "NON_VERIFIE",
-        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
-      },
-      "officialApi": {
-        "status": "unknown"
-      },
-      "automation": {
-        "status": "unknown"
-      },
-      "queue": {
-        "status": "unknown"
-      },
-      "purchaseLimits": {
-        "status": "unknown"
-      },
-      "cart": {
-        "status": "unknown"
-      },
       "clues": []
     },
     {
@@ -191,25 +115,6 @@
         "dice.fm",
         "support.dice.fm"
       ],
-      "verification": {
-        "status": "NON_VERIFIE",
-        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
-      },
-      "officialApi": {
-        "status": "unknown"
-      },
-      "automation": {
-        "status": "unknown"
-      },
-      "queue": {
-        "status": "unknown"
-      },
-      "purchaseLimits": {
-        "status": "unknown"
-      },
-      "cart": {
-        "status": "unknown"
-      },
       "clues": [
         {
           "url": "https://support.dice.fm/article/255-united-kingdom-terms-of-use",
@@ -242,25 +147,6 @@
         "web.digitick.com",
         "aide.digitick.com"
       ],
-      "verification": {
-        "status": "NON_VERIFIE",
-        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
-      },
-      "officialApi": {
-        "status": "unknown"
-      },
-      "automation": {
-        "status": "unknown"
-      },
-      "queue": {
-        "status": "unknown"
-      },
-      "purchaseLimits": {
-        "status": "unknown"
-      },
-      "cart": {
-        "status": "unknown"
-      },
       "clues": [
         {
           "url": "https://www.digitick.com/content/terms-and-conditions",
@@ -286,25 +172,6 @@
         "eventbrite.com",
         "eventbrite.fr"
       ],
-      "verification": {
-        "status": "NON_VERIFIE",
-        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
-      },
-      "officialApi": {
-        "status": "unknown"
-      },
-      "automation": {
-        "status": "unknown"
-      },
-      "queue": {
-        "status": "unknown"
-      },
-      "purchaseLimits": {
-        "status": "unknown"
-      },
-      "cart": {
-        "status": "unknown"
-      },
       "clues": [
         {
           "url": "https://www.eventbrite.com/platform/docs/orders",
@@ -340,25 +207,6 @@
         "eventim.com",
         "misc.seetickets.us"
       ],
-      "verification": {
-        "status": "NON_VERIFIE",
-        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
-      },
-      "officialApi": {
-        "status": "unknown"
-      },
-      "automation": {
-        "status": "unknown"
-      },
-      "queue": {
-        "status": "unknown"
-      },
-      "purchaseLimits": {
-        "status": "unknown"
-      },
-      "cart": {
-        "status": "unknown"
-      },
       "clues": [
         {
           "url": "https://www.eventim.fr/help/terms/",
@@ -388,25 +236,6 @@
         "fifa.com",
         "tickets.fifa.com"
       ],
-      "verification": {
-        "status": "NON_VERIFIE",
-        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
-      },
-      "officialApi": {
-        "status": "unknown"
-      },
-      "automation": {
-        "status": "unknown"
-      },
-      "queue": {
-        "status": "unknown"
-      },
-      "purchaseLimits": {
-        "status": "unknown"
-      },
-      "cart": {
-        "status": "unknown"
-      },
       "clues": []
     },
     {
@@ -427,25 +256,6 @@
         "fnac.com",
         "fnacdarty.com"
       ],
-      "verification": {
-        "status": "NON_VERIFIE",
-        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
-      },
-      "officialApi": {
-        "status": "unknown"
-      },
-      "automation": {
-        "status": "unknown"
-      },
-      "queue": {
-        "status": "unknown"
-      },
-      "purchaseLimits": {
-        "status": "unknown"
-      },
-      "cart": {
-        "status": "unknown"
-      },
       "clues": [
         {
           "url": "https://www.fnacspectacles.com/help/terms/",
@@ -471,25 +281,6 @@
         "dev.helloasso.com",
         "api.helloasso.com"
       ],
-      "verification": {
-        "status": "NON_VERIFIE",
-        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
-      },
-      "officialApi": {
-        "status": "unknown"
-      },
-      "automation": {
-        "status": "unknown"
-      },
-      "queue": {
-        "status": "unknown"
-      },
-      "purchaseLimits": {
-        "status": "unknown"
-      },
-      "cart": {
-        "status": "unknown"
-      },
       "clues": [
         {
           "url": "https://dev.helloasso.com/docs/introduction-%C3%A0-lapi-de-helloasso",
@@ -520,25 +311,6 @@
         "la28.org",
         "tickets.la28.org"
       ],
-      "verification": {
-        "status": "NON_VERIFIE",
-        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
-      },
-      "officialApi": {
-        "status": "unknown"
-      },
-      "automation": {
-        "status": "unknown"
-      },
-      "queue": {
-        "status": "unknown"
-      },
-      "purchaseLimits": {
-        "status": "unknown"
-      },
-      "cart": {
-        "status": "unknown"
-      },
       "clues": []
     },
     {
@@ -554,25 +326,6 @@
       "officialHosts": [
         "operadeparis.fr"
       ],
-      "verification": {
-        "status": "NON_VERIFIE",
-        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
-      },
-      "officialApi": {
-        "status": "unknown"
-      },
-      "automation": {
-        "status": "unknown"
-      },
-      "queue": {
-        "status": "unknown"
-      },
-      "purchaseLimits": {
-        "status": "unknown"
-      },
-      "cart": {
-        "status": "unknown"
-      },
       "clues": []
     },
     {
@@ -591,25 +344,6 @@
         "fft.fr",
         "billetterie.fft.fr"
       ],
-      "verification": {
-        "status": "NON_VERIFIE",
-        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
-      },
-      "officialApi": {
-        "status": "unknown"
-      },
-      "automation": {
-        "status": "unknown"
-      },
-      "queue": {
-        "status": "unknown"
-      },
-      "purchaseLimits": {
-        "status": "unknown"
-      },
-      "cart": {
-        "status": "unknown"
-      },
       "clues": [
         {
           "url": "https://tickets.rolandgarros.com/fr/tout-savoir-tirage-au-sort",
@@ -640,25 +374,6 @@
         "seatgeek.com",
         "platform.seatgeek.com"
       ],
-      "verification": {
-        "status": "NON_VERIFIE",
-        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
-      },
-      "officialApi": {
-        "status": "unknown"
-      },
-      "automation": {
-        "status": "unknown"
-      },
-      "queue": {
-        "status": "unknown"
-      },
-      "purchaseLimits": {
-        "status": "unknown"
-      },
-      "cart": {
-        "status": "unknown"
-      },
       "clues": []
     },
     {
@@ -680,25 +395,6 @@
         "support.seetickets.us",
         "group.seetickets.com"
       ],
-      "verification": {
-        "status": "NON_VERIFIE",
-        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
-      },
-      "officialApi": {
-        "status": "unknown"
-      },
-      "automation": {
-        "status": "unknown"
-      },
-      "queue": {
-        "status": "unknown"
-      },
-      "purchaseLimits": {
-        "status": "unknown"
-      },
-      "cart": {
-        "status": "unknown"
-      },
       "clues": [
         {
           "url": "https://www.seetickets.com/Content/Terms-and-Conditions",
@@ -725,25 +421,6 @@
         "support-pro.shotgun.live",
         "pro.shotgun.live"
       ],
-      "verification": {
-        "status": "NON_VERIFIE",
-        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
-      },
-      "officialApi": {
-        "status": "unknown"
-      },
-      "automation": {
-        "status": "unknown"
-      },
-      "queue": {
-        "status": "unknown"
-      },
-      "purchaseLimits": {
-        "status": "unknown"
-      },
-      "cart": {
-        "status": "unknown"
-      },
       "clues": [
         {
           "url": "https://support.shotgun.live/hc/en-us/articles/14330476029330--General-Terms-and-Conditions",
@@ -768,25 +445,6 @@
         "stubhub.com",
         "stubhub.fr"
       ],
-      "verification": {
-        "status": "NON_VERIFIE",
-        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
-      },
-      "officialApi": {
-        "status": "unknown"
-      },
-      "automation": {
-        "status": "unknown"
-      },
-      "queue": {
-        "status": "unknown"
-      },
-      "purchaseLimits": {
-        "status": "unknown"
-      },
-      "cart": {
-        "status": "unknown"
-      },
       "clues": []
     },
     {
@@ -814,25 +472,6 @@
         "am.ticketmaster.com",
         "blog.ticketmaster.com"
       ],
-      "verification": {
-        "status": "NON_VERIFIE",
-        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
-      },
-      "officialApi": {
-        "status": "unknown"
-      },
-      "automation": {
-        "status": "unknown"
-      },
-      "queue": {
-        "status": "unknown"
-      },
-      "purchaseLimits": {
-        "status": "unknown"
-      },
-      "cart": {
-        "status": "unknown"
-      },
       "clues": [
         {
           "url": "https://developer.ticketmaster.com/products-and-docs/apis/discovery-api/v2/",
@@ -875,25 +514,6 @@
         "ticketswap.com",
         "ticketswap.fr"
       ],
-      "verification": {
-        "status": "NON_VERIFIE",
-        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
-      },
-      "officialApi": {
-        "status": "unknown"
-      },
-      "automation": {
-        "status": "unknown"
-      },
-      "queue": {
-        "status": "unknown"
-      },
-      "purchaseLimits": {
-        "status": "unknown"
-      },
-      "cart": {
-        "status": "unknown"
-      },
       "clues": []
     },
     {
@@ -912,25 +532,6 @@
         "editorial.uefa.com",
         "documents.uefa.com"
       ],
-      "verification": {
-        "status": "NON_VERIFIE",
-        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
-      },
-      "officialApi": {
-        "status": "unknown"
-      },
-      "automation": {
-        "status": "unknown"
-      },
-      "queue": {
-        "status": "unknown"
-      },
-      "purchaseLimits": {
-        "status": "unknown"
-      },
-      "cart": {
-        "status": "unknown"
-      },
       "clues": [
         {
           "url": "https://www.uefa.com/euro2028/news/02a0-1f55506ebc73-bd595aa88468-1000--uefa-euro-2028-puts-fans-first-with-fair-and-transparent-/",
@@ -961,25 +562,6 @@
         "viagogo.com",
         "viagogo.fr"
       ],
-      "verification": {
-        "status": "NON_VERIFIE",
-        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
-      },
-      "officialApi": {
-        "status": "unknown"
-      },
-      "automation": {
-        "status": "unknown"
-      },
-      "queue": {
-        "status": "unknown"
-      },
-      "purchaseLimits": {
-        "status": "unknown"
-      },
-      "cart": {
-        "status": "unknown"
-      },
       "clues": []
     },
     {
@@ -1003,25 +585,6 @@
         "support.weezevent.com",
         "help.weezevent.com"
       ],
-      "verification": {
-        "status": "NON_VERIFIE",
-        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
-      },
-      "officialApi": {
-        "status": "unknown"
-      },
-      "automation": {
-        "status": "unknown"
-      },
-      "queue": {
-        "status": "unknown"
-      },
-      "purchaseLimits": {
-        "status": "unknown"
-      },
-      "cart": {
-        "status": "unknown"
-      },
       "clues": [
         {
           "url": "https://api.weezevent.com/",
@@ -1051,25 +614,6 @@
       "officialHosts": [
         "yurplan.com"
       ],
-      "verification": {
-        "status": "NON_VERIFIE",
-        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
-      },
-      "officialApi": {
-        "status": "unknown"
-      },
-      "automation": {
-        "status": "unknown"
-      },
-      "queue": {
-        "status": "unknown"
-      },
-      "purchaseLimits": {
-        "status": "unknown"
-      },
-      "cart": {
-        "status": "unknown"
-      },
       "clues": []
     }
   ]

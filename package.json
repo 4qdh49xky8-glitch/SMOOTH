@@ -24,7 +24,9 @@
     "test:adapters": "node --import tsx --test tests/adapters.contract.test.ts",
     "new-site": "tsx scripts/new-site.ts",
     "test:stress": "node --import tsx --test tests/stress/*.test.ts",
-    "platforms": "tsx src/index.ts platforms"
+    "platforms": "tsx src/index.ts platforms",
+    "platform": "tsx src/index.ts platform",
+    "doctor": "tsx src/index.ts doctor"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",

@@ -265,10 +265,14 @@ export class Agent {
       try {
         // Disponibilité (HTTP) et état de la page (lecture seule) EN PARALLÈLE : aucune latence ajoutée,
         // et aucune sélection n'est tentée si une file d'attente / un CAPTCHA / un contrôle anti-bot est affiché.
-        [snapshot, blocker] = await Promise.all([
-          adapter.fetchSale(ctx),
-          withTimeout(adapter.detectBlocker(ctx), BLOCKER_CHECK_TIMEOUT_MS, null),
-        ]);
+        if (adapter.pollState) {
+          ({ snapshot, blocker } = await adapter.pollState(ctx));
+        } else {
+          [snapshot, blocker] = await Promise.all([
+            adapter.fetchSale(ctx),
+            withTimeout(adapter.detectBlocker(ctx), BLOCKER_CHECK_TIMEOUT_MS, null),
+          ]);
+        }
         this.telemetry.poll(clock.now() - t0);
         readErrors = 0;
       } catch (err) {

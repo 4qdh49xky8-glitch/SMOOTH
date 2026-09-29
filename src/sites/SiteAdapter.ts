@@ -155,4 +155,11 @@ export interface SiteAdapter {
 
   /** Lecture seule de la page : file d'attente, CAPTCHA, anti-bot, limite d'achat, session expirée. */
   detectBlocker(ctx: AdapterContext): Promise<Blocker | null>;
+
+  /**
+   * Optionnel — lecture UNIQUE et cohérente « disponibilité + état bloquant » au même instant. Le cœur la préfère à
+   * fetchSale + detectBlocker en parallèle quand ces deux lectures partagent un canal à cadence plafonnée (API officielle).
+   * Contrat : si un blocage est signalé, le snapshot n'invite pas à agir (aucune sélection pendant une file d'attente).
+   */
+  pollState?(ctx: AdapterContext): Promise<{ snapshot: SaleSnapshot; blocker: Blocker | null }>;
 }

@@ -1,9 +1,11 @@
 import "dotenv/config";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
-import { liveCommand } from "./cli/live.js";
+import { doctorCommand } from "./cli/doctor.js";
+import { liveCommand, type LiveDeps } from "./cli/live.js";
 import { simulateCommand } from "./cli/simulate.js";
 import { sitesCommand } from "./cli/sites.js";
+import { platformCommand } from "./cli/platform.js";
 import { platformsCommand } from "./cli/platforms.js";
 import { statsCommand } from "./cli/stats.js";
 import { validateCommand } from "./cli/validate.js";
@@ -18,6 +20,8 @@ Adaptateurs et configuration
   validate [fichier|profil]      Valide une configuration sans contacter aucun site                    (npm run validate -- config/event.json)
   validate --all                 Valide tous les profils de ${PROFILES_DIR}/
   profiles                       Liste les profils disponibles
+  doctor                         Diagnostic local : Node, Chromium, config, adaptateurs, preuves, expiration, environnement, permissions  (npm run doctor)
+  platform <verify|template|check|add|history>   Preuves officielles : ce qui manque, modèle, validation, dépôt, historique   (npm run platform verify)
   platforms                      Tableau interne des plateformes candidates (preuves officielles, verdicts)  (npm run platforms)
                                  --check : cohérence du catalogue · --hosts : domaines officiels à autoriser · --json
 
@@ -31,7 +35,7 @@ Exécution
 Options : --config <fichier> | --profile <nom>   --log-level error|warn|info|debug   --log-file <fichier>
           --scenario <nom> | --all   --start-in <ms>   --json   --trace   --exit-when-done   --dir <runs>`;
 
-export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
+export async function main(argv: string[] = process.argv.slice(2), deps: LiveDeps = {}): Promise<number> {
   const { positionals, values } = parseArgs({
     args: argv,
     allowPositionals: true,
@@ -51,6 +55,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       check: { type: "boolean", default: false },
       hosts: { type: "boolean", default: false },
       markdown: { type: "boolean", default: false },
+      topic: { type: "string" },
     },
   });
   const [command, arg] = positionals;
@@ -61,6 +66,10 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       return sitesCommand({ json: values.json });
     case "validate":
       return validateCommand(target, { all: values.all, json: values.json });
+    case "doctor":
+      return doctorCommand({ json: values.json });
+    case "platform":
+      return platformCommand({ sub: arg, target: positionals[2], topic: values.topic, json: values.json });
     case "platforms":
       return platformsCommand({ json: values.json, check: values.check, hosts: values.hosts, markdown: values.markdown });
     case "profiles": {
@@ -86,14 +95,17 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     case "run":
     case "login":
     case "check":
-      return liveCommand({
-        command,
-        target,
-        trace: values.trace,
-        exitWhenDone: values["exit-when-done"],
-        logLevel: values["log-level"],
-        logFile: values["log-file"],
-      });
+      return liveCommand(
+        {
+          command,
+          target,
+          trace: values.trace,
+          exitWhenDone: values["exit-when-done"],
+          logLevel: values["log-level"],
+          logFile: values["log-file"],
+        },
+        deps,
+      );
     default:
       console.log(USAGE);
       return command ? 1 : 0;

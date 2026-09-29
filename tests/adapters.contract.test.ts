@@ -20,6 +20,11 @@ for (const { adapter, file } of entries) {
   test(`contrat « ${adapter.meta.id} » : méthodes, capacités, autorisation, garde-fou de paiement, code source`, () => {
     const issues = checkAdapterContract(adapter, { sourceFile: file, catalog: loadCatalog() });
     const errors = issues.filter((i) => i.severity === "error");
+    if (errors.some((e) => e.code === "SKELETON_NOT_VERIFIED")) {
+      // Squelette explicitement NOT_VERIFIED : il doit être BLOQUÉ (non exécutable), ce qui est l'état attendu.
+      assert.ok(errors.some((e) => e.code === "PLATFORM_AUTH" || e.code === "COMPLIANCE"), "un squelette NOT_VERIFIED doit aussi être refusé par l'autorisation");
+      return;
+    }
     assert.deepEqual(errors.map((e) => `[${e.code}] ${e.message}`), []);
   });
 }

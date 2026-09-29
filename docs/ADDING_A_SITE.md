@@ -23,11 +23,12 @@ Sommaire : [0. Autorisation](#0-avant-tout-code--lautorisation-bloquant) · [1. 
 
 ## 0. Avant tout code : l'autorisation (bloquant)
 
-**La décision se consigne d'abord dans le catalogue des plateformes** (`platforms/catalog.json`, voir
-[PLATFORMS.md](PLATFORMS.md)), avec des **preuves officielles datées** (URL sur un domaine officiel de la plateforme,
-date, passage cité). Le cœur déduit un *verdict* de ces preuves et **refuse** tout adaptateur dont la plateforme n'est pas
-vérifiée ou dont le canal n'est pas autorisé : pas de preuve, pas d'exécution. `npm run platforms` affiche l'état ;
-`npm run platforms -- --check` refuse qu'un adaptateur existe pour une plateforme `NON VÉRIFIÉ` / `NON AUTORISÉ`.
+**La décision se consigne d'abord sous forme de preuve** : un fichier `platforms/evidence/<plateforme>-<date>.json`
+(URL HTTPS sur un domaine officiel de la plateforme, date de lecture, extrait cité, canal autorisé ; voir
+[PLATFORMS.md](PLATFORMS.md)). Le statut (`NOT_VERIFIED`, `VERIFIED_API`, `VERIFIED_BROWSER`, `VERIFIED_API_AND_BROWSER`,
+`NOT_ALLOWED`, `EXPIRED`) est **calculé** ; la preuve expire après 180 jours. Le cœur **refuse** tout adaptateur dont la
+plateforme n'est pas vérifiée pour son canal. `npm run platform verify <plateforme>` liste les pièces manquantes ;
+`npm run platforms -- --check` refuse qu'un adaptateur existe pour une plateforme non vérifiée.
 
 Répondez d'abord à ces questions **en lisant les documents du site** (CGU, règles d'achat, conditions
 générales de vente, page développeur/partenaires) :
@@ -60,8 +61,14 @@ explicitement autorisée, sinon intervention humaine (rappels, aucun contact ave
 npm run new-site -- mon-site "Mon Site"
 ```
 
-Crée `src/sites/MonSite.ts`, `src/selectors/mon-site.ts` et `tests/mon-site.test.ts`. Le squelette est
-**volontairement non conforme** : les quatre champs `TODO(COMPLIANCE)` doivent être renseignés, sinon
+Crée `src/sites/MonSite.ts`, `src/selectors/mon-site.ts` et `tests/mon-site.test.ts`. Avec
+`--platform <id du catalogue> [--channel api|browser]` :
+
+- statut compatible → adaptateur utilisable (`meta.platform` / `meta.channel` renseignés) ;
+- `NOT_VERIFIED` / `EXPIRED` → **squelette marqué `@skeleton-status NOT_VERIFIED`**, non conforme, jamais lancé ;
+- `NOT_ALLOWED` → refus, aucun fichier.
+
+Sans `--platform`, le squelette est non conforme : les champs `TODO(COMPLIANCE)` doivent être renseignés, sinon
 `npm run test:adapters` échoue et le cœur refuse de le lancer. Vérifiez qu'il est bien découvert :
 
 ```bash

@@ -28,8 +28,10 @@ et laisse le navigateur ouvert pour que vous vérifiiez et payiez vous-même.
 | `npm run validate -- config/event.json` | valide une configuration **sans contacter aucun site** (`-- concert` pour un profil, `-- --all` pour tous) |
 | `npm run profiles` | liste les profils de `config/events/` et leur validité |
 | `npm run simulate` | rejoue le vrai cœur contre un faux site, sans réseau ni navigateur (`-- --all`, `-- --scenario queue`) |
-| `npm run platforms` | tableau interne des plateformes candidates : preuves officielles, verdicts (`-- --check`, `-- --hosts`, `-- --markdown`, `-- --json`) |
-| `npm run new-site -- mon-site "Mon Site"` | génère le squelette d'un adaptateur (non conforme tant que l'autorisation n'est pas renseignée) |
+| `npm run platforms` | catalogue des plateformes et statut calculé à partir des preuves (`-- --json`, `-- --check`, `-- --hosts`, `-- --markdown`) |
+| `npm run platform verify [nom]` | pièces de preuve exactes à consigner et informations manquantes (aussi `history`, `template`, `check`, `add`) ; aucun accès réseau |
+| `npm run doctor` | diagnostic local : Node, Chromium, configs, adaptateurs, preuves et expirations, variables d'environnement, permissions |
+| `npm run new-site -- mon-site "Mon Site" --platform <id>` | adaptateur utilisable si la plateforme a un verdict compatible ; sinon squelette marqué `NOT_VERIFIED` ; refus si `NOT_ALLOWED` |
 | `npm run login` | connexion manuelle dans la fenêtre du navigateur (session conservée) |
 | `npm run check` | valide la config, la conformité et mesure l'horloge du site |
 | `npm start` | attend l'ouverture, met au panier, notifie, s'arrête avant le paiement (`-- --profile concert`) |
@@ -81,7 +83,7 @@ registre, de la config ni des commandes.
 
 | Document | Contenu |
 |----------|---------|
-| [docs/PLATFORMS.md](docs/PLATFORMS.md) | **étude multi-plateformes** : statut (non terminée : sources officielles inaccessibles), tableau interne, choix du canal API → navigateur → humain, protocole de vérification |
+| [docs/PLATFORMS.md](docs/PLATFORMS.md) | **catalogue et preuves** : statuts, format et refus des preuves (expiration 180 jours), historique, commandes, interface API, choix du canal API → navigateur → humain |
 | [docs/ADDING_A_SITE.md](docs/ADDING_A_SITE.md) | créer un adaptateur : autorisation d'abord, squelette, méthodes, états, offres, sélecteurs, tests, checklist |
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | profils et héritage, référence des champs, stratégie de sélection, recettes par type d'événement |
 | [docs/STATES_AND_TELEMETRY.md](docs/STATES_AND_TELEMETRY.md) | les 10 états, raisons d'échec, télémétrie locale et vie privée, niveaux de logs |

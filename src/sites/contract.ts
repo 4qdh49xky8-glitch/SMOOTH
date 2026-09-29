@@ -84,8 +84,28 @@ export function checkAdapterContract(adapter: SiteAdapter, opts: { sourceFile?: 
   const req = meta.requires?.env;
   if (req && (!Array.isArray(req) || req.some((k) => !/^[A-Z][A-Z0-9_]*$/.test(k)))) err("REQUIRES_ENV", "meta.requires.env : noms de variables en MAJUSCULES (jamais de valeur dans le code)");
 
+  // Aucune méthode de paiement, quel que soit le canal : le paiement reste toujours humain.
+  const methodNames = new Set<string>();
+  for (let o: object | null = adapter; o && o !== Object.prototype; o = Object.getPrototypeOf(o)) {
+    for (const k of Object.getOwnPropertyNames(o)) if (typeof (adapter as unknown as Record<string, unknown>)[k] === "function") methodNames.add(k);
+  }
+  for (const m of methodNames) if (/^(pay|payment|checkout|purchase|placeOrder|confirmOrder|charge|settle)/i.test(m)) err("PAYMENT_METHOD", `méthode « ${m}() » interdite : un adaptateur ne paie jamais`);
+
+  const isApi = (adapter as { isApiAdapter?: boolean }).isApiAdapter === true;
+  if (isApi) {
+    // Adaptateur API : pas de navigateur, donc pas d'URL de paiement à garder ; en revanche le canal doit être déclaré.
+    if (meta.channel !== "official-api") err("API_CHANNEL", "un adaptateur API doit déclarer meta.channel = \"official-api\"");
+    if (meta.capabilities?.officialApi !== true) err("API_CHANNEL", "un adaptateur API doit déclarer capabilities.officialApi = true");
+    if (meta.compliance?.policy === "permitted-by-terms") err("API_POLICY", "un adaptateur API relève de policy « official-api »");
+    if (!meta.requires?.env?.length && meta.compliance?.policy !== "demo") warn("API_SECRET", "meta.requires.env : déclarez la variable d'environnement du secret de l'API (jamais sa valeur)");
+  } else if (meta.channel === "official-api") {
+    err("API_CHANNEL", "channel « official-api » réservé aux adaptateurs qui étendent BaseApiAdapter (aucun navigateur)");
+  }
+
   const patterns = adapter.paymentUrlPatterns;
-  if (!Array.isArray(patterns) || patterns.length === 0) err("PAYMENT_GUARD", "paymentUrlPatterns vide : le garde-fou de paiement serait inactif");
+  if (isApi) {
+    /* pas de garde-fou navigateur */
+  } else if (!Array.isArray(patterns) || patterns.length === 0) err("PAYMENT_GUARD", "paymentUrlPatterns vide : le garde-fou de paiement serait inactif");
   else {
     for (const p of patterns) {
       if (p.global || p.sticky) err("PAYMENT_GUARD_FLAGS", `le motif ${p} ne doit pas avoir de drapeau g/y (test() devient à état)`);
@@ -101,6 +121,8 @@ export function checkAdapterContract(adapter: SiteAdapter, opts: { sourceFile?: 
     const files = [opts.sourceFile, join(dirname(opts.sourceFile), "..", "selectors", `${meta.id}.ts`)];
     for (const f of files) {
       if (!existsSync(f)) continue;
+      // Un squelette généré pour une plateforme non vérifiée porte le marqueur : il ne peut pas être livré tel quel.
+      if (/@skeleton-status\s+NOT_VERIFIED/.test(readFileSync(f, "utf8"))) issues.push({ severity: "error", code: "SKELETON_NOT_VERIFIED", message: `${f.split("/").slice(-2).join("/")} : squelette NOT_VERIFIED — obtenez d'abord une preuve officielle valide (npm run platform verify), puis régénérez ou retirez le marqueur` });
       for (const i of scanSource(readFileSync(f, "utf8"))) issues.push({ ...i, message: `${f.split("/").slice(-2).join("/")} : ${i.message}` });
     }
   }

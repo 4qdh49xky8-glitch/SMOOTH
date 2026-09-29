@@ -1,5 +1,5 @@
 import type { AdapterMeta } from "../sites/SiteAdapter.js";
-import { adapterVerdict, findPlatform, type AdapterVerdict, type Catalog } from "./catalog.js";
+import { findPlatform, stateOf, type Catalog, type PlatformStatus } from "./catalog.js";
 
 /** Canal technique d'un adaptateur : API officielle ou pilotage du navigateur. */
 export const channelOf = (meta: AdapterMeta): "official-api" | "browser" => meta.channel ?? (meta.capabilities.officialApi ? "official-api" : "browser");
@@ -10,27 +10,28 @@ export const platformOf = (meta: AdapterMeta): string => meta.platform ?? meta.i
 export interface Authorization {
   ok: boolean;
   reason?: string;
-  verdict?: AdapterVerdict;
+  status?: PlatformStatus;
 }
 
 /**
  * Un adaptateur de démo est exempté (il est limité à localhost par assertCompliant). Tout autre adaptateur doit
- * correspondre à une plateforme du catalogue dont le verdict, déduit des PREUVES officielles, autorise son canal.
+ * correspondre à une plateforme dont le STATUT, déduit des PREUVES officielles valides et non expirées, autorise
+ * son canal. NOT_VERIFIED, EXPIRED et NOT_ALLOWED ne l'autorisent jamais.
  */
 export function authorizeAdapter(meta: AdapterMeta, catalog: Catalog, now = Date.now()): Authorization {
   if (meta.compliance.policy === "demo") return { ok: true };
   const platform = findPlatform(catalog, platformOf(meta));
   if (!platform) return { ok: false, reason: `plateforme « ${platformOf(meta)} » absente du catalogue (platforms/catalog.json)` };
-  const { verdict, channels, reasons } = adapterVerdict(platform, now);
+  const st = stateOf(catalog, platform.id, now);
   const channel = channelOf(meta);
-  if (!channels.includes(channel)) {
-    return { ok: false, verdict, reason: `verdict de la plateforme « ${platform.id} » : ${verdict} (${reasons.join("; ")}) ; canal « ${channel} » non autorisé par les preuves` };
+  if (!st.channels.includes(channel)) {
+    return { ok: false, status: st.status, reason: `statut de la plateforme « ${platform.id} » : ${st.status} (${st.reasons.join("; ")}) ; canal « ${channel} » non autorisé par les preuves` };
   }
   const policy = meta.compliance.policy;
   if ((channel === "official-api") !== (policy === "official-api")) {
-    return { ok: false, verdict, reason: `meta.compliance.policy « ${policy} » incohérente avec le canal « ${channel} »` };
+    return { ok: false, status: st.status, reason: `meta.compliance.policy « ${policy} » incohérente avec le canal « ${channel} »` };
   }
-  return { ok: true, verdict };
+  return { ok: true, status: st.status };
 }
 
 /** Version qui lève : garde-fou appliqué par le cœur avant toute action. */
