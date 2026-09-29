@@ -1,0 +1,8 @@
+node_modules
+dist
+.env
+.profile
+.cache
+runs
+*.log
+config/event.json
