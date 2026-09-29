@@ -7,7 +7,10 @@ import { defaultUserDataDir, openBrowser } from "../browser/launch.js";
 import { loadConfig, resolveConfigPath } from "../config/load.js";
 import { SelectorResolver } from "../selectors/resolver.js";
 import { assertCompliant } from "../sites/compliance.js";
-import { getAdapter } from "../sites/registry.js";
+import { resolveChannel } from "../agent/channels.js";
+import { runHumanAssist } from "../agent/humanAssist.js";
+import { loadCatalog } from "../platforms/catalog.js";
+import { discoverAdapters } from "../sites/registry.js";
 import type { AdapterContext } from "../sites/SiteAdapter.js";
 import { Clock, estimateOffset } from "../utils/clock.js";
 import { acquireEventLock, eventKey } from "../utils/lock.js";
@@ -33,7 +36,30 @@ export async function liveCommand(o: LiveOptions): Promise<number> {
   const logFile = (o.logFile ?? config.logging.file)?.replaceAll("{profile}", profile).replaceAll("{pid}", String(process.pid));
   const log = createLogger({ level: pickLevel(o.logLevel, process.env.LOG_LEVEL, config.logging.level), file: logFile, scope: instance });
 
-  const adapter = await getAdapter(config.site);
+  // Choix du canal : API officielle → navigateur → intervention humaine, selon les adaptateurs déclarés et le catalogue.
+  const decision = resolveChannel({ platform: config.site, adapters: await discoverAdapters(), catalog: loadCatalog(), env: process.env, config });
+  log.info(`Canal retenu : ${decision.channel}${decision.adapter ? ` (adaptateur « ${decision.adapter.meta.id} »)` : ""} — ${decision.reasons.join("; ")}`);
+  for (const r of decision.rejected) log.info(`Canal écarté : ${r.adapter} (${r.channel}) — ${r.reason}`);
+
+  if (decision.channel === "human") {
+    // Aucun navigateur, aucune requête vers le site : seulement des rappels. C'est vous qui achetez.
+    if (o.command !== "run") {
+      log.warn("Canal humain : aucune session n'est pilotée (ni connexion, ni contrôle) pour cette plateforme.");
+      return 0;
+    }
+    await runHumanAssist({
+      eventName: config.event.name,
+      eventUrl: config.event.url,
+      saleEpochMs: Date.parse(config.sale.startTime),
+      clock: new Clock(),
+      log: log.child("human"),
+      reason: decision.reasons.join("; "),
+      quantity: config.tickets.quantity,
+      maxPricePerTicket: config.tickets.maxPricePerTicket,
+    });
+    return 0;
+  }
+  const adapter = decision.adapter!;
   assertCompliant(adapter.meta, adapter.resolveEventUrl(config)); // refus AVANT d'ouvrir le navigateur
 
   // Un seul bot par événement (même adaptateur + même page d'événement), quel que soit le profil.

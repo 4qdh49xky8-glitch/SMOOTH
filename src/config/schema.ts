@@ -55,6 +55,11 @@ export const ConfigSchema = z.object({
   extends: z.string().optional(),
   /** Identifiant d'un adaptateur présent dans src/sites/ (voir `npm run check -- --list-sites`). */
   site: z.string().min(1),
+  /**
+   * Canal d'exécution. « auto » (défaut) : API officielle → navigateur → intervention humaine, selon ce que les
+   * adaptateurs déclarent ET ce que le catalogue autorise. Un canal forcé ne peut jamais être plus permissif que ce qui est autorisé.
+   */
+  channel: z.enum(["auto", "official-api", "browser", "human"]).default("auto"),
   /** Réglages propres à l'adaptateur (libres, validés par l'adaptateur lui-même). */
   siteOptions: z.record(z.unknown()).default({}),
   event: z.object({

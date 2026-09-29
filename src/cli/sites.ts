@@ -1,11 +1,13 @@
 import { checkAdapterContract } from "../sites/contract.js";
+import { loadCatalog } from "../platforms/catalog.js";
 import { discoverAdapterEntries } from "../sites/registry.js";
 
 /** `npm run sites` : liste des adaptateurs, base d'autorisation et état du contrat. */
 export async function sitesCommand(opts: { json: boolean }): Promise<number> {
   const entries = await discoverAdapterEntries();
+  const catalog = loadCatalog();
   const rows = entries.map(({ adapter, file }) => {
-    const issues = checkAdapterContract(adapter, { sourceFile: file });
+    const issues = checkAdapterContract(adapter, { sourceFile: file, catalog });
     const errors = issues.filter((i) => i.severity === "error");
     const c = adapter.meta.capabilities;
     return {

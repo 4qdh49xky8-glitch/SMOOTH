@@ -33,7 +33,8 @@ Sans option, `npm start` lit `config/event.json`. Un ancien fichier plat (V1 : `
 
 | Champ | Défaut | Rôle |
 |-------|--------|------|
-| `site` | requis | `meta.id` d'un adaptateur de `src/sites/` (`npm run sites`) |
+| `site` | requis | plateforme : `meta.platform` (ou `meta.id`) d'un adaptateur de `src/sites/`, ou entrée de `platforms/catalog.json` |
+| `channel` | `auto` | `auto` : API officielle → navigateur → intervention humaine, selon les adaptateurs et les preuves du catalogue ; `official-api` / `browser` / `human` pour restreindre. Un canal forcé ne peut jamais être plus permissif que l'autorisation ([PLATFORMS.md](PLATFORMS.md)) |
 | `siteOptions` | `{}` | réglages libres propres à l'adaptateur (validés par `validateOptions`) |
 | `event.name` | requis | nom de l'événement |
 | `event.date` | — | date de l'événement `AAAA-MM-JJ` (contrôle de cohérence) |

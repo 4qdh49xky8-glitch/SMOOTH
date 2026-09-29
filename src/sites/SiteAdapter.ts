@@ -72,6 +72,12 @@ export interface Compliance {
 export interface AdapterMeta {
   id: string;
   displayName: string;
+  /** Entrée du catalogue des plateformes (platforms/catalog.json) ; par défaut `id`. Une même plateforme peut avoir plusieurs adaptateurs (un par canal). */
+  platform?: string;
+  /** Canal technique : "official-api" ou "browser" (par défaut déduit de capabilities.officialApi). */
+  channel?: "official-api" | "browser";
+  /** Prérequis d'exécution : un adaptateur dont les variables d'environnement manquent n'est pas retenu (le cœur passe au canal suivant). */
+  requires?: { env?: string[] };
   compliance: Compliance;
   capabilities: {
     /** Utilise une API officielle plutôt que le pilotage de pages. */

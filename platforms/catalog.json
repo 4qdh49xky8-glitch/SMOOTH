@@ -1,0 +1,1076 @@
+{
+  "schemaVersion": 1,
+  "note": "Catalogue interne. Aucune plateforme n'est autorisée tant qu'une preuve officielle datée n'est pas consignée (voir docs/PLATFORMS.md). Les « clues » sont des pistes NON vérifiées.",
+  "platforms": [
+    {
+      "id": "axs",
+      "name": "AXS",
+      "regions": [
+        "US",
+        "UK",
+        "Europe"
+      ],
+      "eventTypes": [
+        "concert",
+        "sport",
+        "spectacle"
+      ],
+      "officialHosts": [
+        "axs.com",
+        "solutions.axs.com",
+        "support.axs.com",
+        "axssupportuk.axs.com"
+      ],
+      "verification": {
+        "status": "NON_VERIFIE",
+        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
+      },
+      "officialApi": {
+        "status": "unknown"
+      },
+      "automation": {
+        "status": "unknown"
+      },
+      "queue": {
+        "status": "unknown"
+      },
+      "purchaseLimits": {
+        "status": "unknown"
+      },
+      "cart": {
+        "status": "unknown"
+      },
+      "clues": [
+        {
+          "url": "https://www.axs.com/about-terms-of-use_US_v1.html",
+          "note": "Le résumé indique une interdiction de moyens automatiques (robots, actualisations répétitives des pages de billetterie).",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        },
+        {
+          "url": "https://support.axs.com/hc/en-us/articles/200745935-What-s-a-Waiting-Room",
+          "note": "Le résumé indique une salle d'attente virtuelle sur les événements très demandés.",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        }
+      ]
+    },
+    {
+      "id": "billetreduc",
+      "name": "BilletReduc",
+      "regions": [
+        "FR"
+      ],
+      "eventTypes": [
+        "spectacle",
+        "theatre"
+      ],
+      "officialHosts": [
+        "billetreduc.com"
+      ],
+      "verification": {
+        "status": "NON_VERIFIE",
+        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
+      },
+      "officialApi": {
+        "status": "unknown"
+      },
+      "automation": {
+        "status": "unknown"
+      },
+      "queue": {
+        "status": "unknown"
+      },
+      "purchaseLimits": {
+        "status": "unknown"
+      },
+      "cart": {
+        "status": "unknown"
+      },
+      "clues": []
+    },
+    {
+      "id": "billetweb",
+      "name": "Billetweb",
+      "regions": [
+        "FR"
+      ],
+      "eventTypes": [
+        "associatif",
+        "festival",
+        "spectacle",
+        "concert"
+      ],
+      "officialHosts": [
+        "billetweb.fr",
+        "blog.billetweb.fr",
+        "aide.billetweb.fr"
+      ],
+      "verification": {
+        "status": "NON_VERIFIE",
+        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
+      },
+      "officialApi": {
+        "status": "unknown"
+      },
+      "automation": {
+        "status": "unknown"
+      },
+      "queue": {
+        "status": "unknown"
+      },
+      "purchaseLimits": {
+        "status": "unknown"
+      },
+      "cart": {
+        "status": "unknown"
+      },
+      "clues": [
+        {
+          "url": "https://www.billetweb.fr/bo/api.php",
+          "note": "API documentée (spécification OpenAPI) ; le résumé évoque l'extraction de données de réservation, donc probablement côté organisateur.",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        },
+        {
+          "url": "https://www.billetweb.fr/fr-fr/conditions-generales-de-vente",
+          "note": "Conditions générales de vente.",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        }
+      ]
+    },
+    {
+      "id": "comedie-francaise",
+      "name": "Comédie-Française (billetterie propre)",
+      "regions": [
+        "FR"
+      ],
+      "eventTypes": [
+        "theatre",
+        "spectacle"
+      ],
+      "officialHosts": [
+        "comedie-francaise.fr"
+      ],
+      "verification": {
+        "status": "NON_VERIFIE",
+        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
+      },
+      "officialApi": {
+        "status": "unknown"
+      },
+      "automation": {
+        "status": "unknown"
+      },
+      "queue": {
+        "status": "unknown"
+      },
+      "purchaseLimits": {
+        "status": "unknown"
+      },
+      "cart": {
+        "status": "unknown"
+      },
+      "clues": []
+    },
+    {
+      "id": "dice",
+      "name": "DICE",
+      "regions": [
+        "UK",
+        "US",
+        "FR",
+        "Europe"
+      ],
+      "eventTypes": [
+        "concert",
+        "festival"
+      ],
+      "officialHosts": [
+        "dice.fm",
+        "support.dice.fm"
+      ],
+      "verification": {
+        "status": "NON_VERIFIE",
+        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
+      },
+      "officialApi": {
+        "status": "unknown"
+      },
+      "automation": {
+        "status": "unknown"
+      },
+      "queue": {
+        "status": "unknown"
+      },
+      "purchaseLimits": {
+        "status": "unknown"
+      },
+      "cart": {
+        "status": "unknown"
+      },
+      "clues": [
+        {
+          "url": "https://support.dice.fm/article/255-united-kingdom-terms-of-use",
+          "note": "Le résumé indique une interdiction des logiciels/processus automatisés et scripts pour accéder aux services.",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        },
+        {
+          "url": "https://support.dice.fm/article/267-united-states-terms-of-use",
+          "note": "Idem (conditions États-Unis).",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        }
+      ]
+    },
+    {
+      "id": "digitick",
+      "name": "Digitick (See Tickets France)",
+      "regions": [
+        "FR"
+      ],
+      "eventTypes": [
+        "concert",
+        "festival",
+        "spectacle",
+        "sport"
+      ],
+      "officialHosts": [
+        "digitick.com",
+        "web.digitick.com",
+        "aide.digitick.com"
+      ],
+      "verification": {
+        "status": "NON_VERIFIE",
+        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
+      },
+      "officialApi": {
+        "status": "unknown"
+      },
+      "automation": {
+        "status": "unknown"
+      },
+      "queue": {
+        "status": "unknown"
+      },
+      "purchaseLimits": {
+        "status": "unknown"
+      },
+      "cart": {
+        "status": "unknown"
+      },
+      "clues": [
+        {
+          "url": "https://www.digitick.com/content/terms-and-conditions",
+          "note": "Conditions générales de vente ; le résumé ne mentionne ni robots ni limites d'achat (peuvent être fixées par l'organisateur).",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        }
+      ]
+    },
+    {
+      "id": "eventbrite",
+      "name": "Eventbrite",
+      "regions": [
+        "International"
+      ],
+      "eventTypes": [
+        "concert",
+        "festival",
+        "spectacle",
+        "associatif"
+      ],
+      "officialHosts": [
+        "eventbrite.com",
+        "eventbrite.fr"
+      ],
+      "verification": {
+        "status": "NON_VERIFIE",
+        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
+      },
+      "officialApi": {
+        "status": "unknown"
+      },
+      "automation": {
+        "status": "unknown"
+      },
+      "queue": {
+        "status": "unknown"
+      },
+      "purchaseLimits": {
+        "status": "unknown"
+      },
+      "cart": {
+        "status": "unknown"
+      },
+      "clues": [
+        {
+          "url": "https://www.eventbrite.com/platform/docs/orders",
+          "note": "Documentation officielle de l'API (commandes, participants, checkout intégrable) ; à établir : périmètre côté organisateur ou acheteur.",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        },
+        {
+          "url": "https://www.eventbrite.com/platform/docs/introduction",
+          "note": "Introduction à l'API.",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        }
+      ]
+    },
+    {
+      "id": "eventim",
+      "name": "Eventim",
+      "regions": [
+        "FR",
+        "DE",
+        "International"
+      ],
+      "eventTypes": [
+        "concert",
+        "sport",
+        "spectacle",
+        "theatre"
+      ],
+      "officialHosts": [
+        "eventim.fr",
+        "eventim.de",
+        "eventim.com",
+        "misc.seetickets.us"
+      ],
+      "verification": {
+        "status": "NON_VERIFIE",
+        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
+      },
+      "officialApi": {
+        "status": "unknown"
+      },
+      "automation": {
+        "status": "unknown"
+      },
+      "queue": {
+        "status": "unknown"
+      },
+      "purchaseLimits": {
+        "status": "unknown"
+      },
+      "cart": {
+        "status": "unknown"
+      },
+      "clues": [
+        {
+          "url": "https://www.eventim.fr/help/terms/",
+          "note": "Le résumé indique que l'usage non autorisé de robots/automates peut faire l'objet de poursuites, et que le vendeur peut refuser une commande en cas de demande anormale.",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        },
+        {
+          "url": "https://www.eventim.fr/campaign/foire-aux-questions",
+          "note": "FAQ ; le résumé évoque des limites par commande fixées par événement (ex. 6 ou 8).",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        }
+      ]
+    },
+    {
+      "id": "fifa",
+      "name": "FIFA (billetterie officielle)",
+      "regions": [
+        "International"
+      ],
+      "eventTypes": [
+        "grand-evenement",
+        "sport"
+      ],
+      "officialHosts": [
+        "fifa.com",
+        "tickets.fifa.com"
+      ],
+      "verification": {
+        "status": "NON_VERIFIE",
+        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
+      },
+      "officialApi": {
+        "status": "unknown"
+      },
+      "automation": {
+        "status": "unknown"
+      },
+      "queue": {
+        "status": "unknown"
+      },
+      "purchaseLimits": {
+        "status": "unknown"
+      },
+      "cart": {
+        "status": "unknown"
+      },
+      "clues": []
+    },
+    {
+      "id": "fnac-spectacles",
+      "name": "Fnac Spectacles (France Billet)",
+      "regions": [
+        "FR"
+      ],
+      "eventTypes": [
+        "concert",
+        "spectacle",
+        "theatre",
+        "sport",
+        "festival"
+      ],
+      "officialHosts": [
+        "fnacspectacles.com",
+        "fnac.com",
+        "fnacdarty.com"
+      ],
+      "verification": {
+        "status": "NON_VERIFIE",
+        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
+      },
+      "officialApi": {
+        "status": "unknown"
+      },
+      "automation": {
+        "status": "unknown"
+      },
+      "queue": {
+        "status": "unknown"
+      },
+      "purchaseLimits": {
+        "status": "unknown"
+      },
+      "cart": {
+        "status": "unknown"
+      },
+      "clues": [
+        {
+          "url": "https://www.fnacspectacles.com/help/terms/",
+          "note": "Conditions générales de vente ; le résumé ne mentionne ni robots, ni file d'attente, ni limites d'achat.",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        }
+      ]
+    },
+    {
+      "id": "helloasso",
+      "name": "HelloAsso",
+      "regions": [
+        "FR"
+      ],
+      "eventTypes": [
+        "associatif",
+        "festival",
+        "spectacle"
+      ],
+      "officialHosts": [
+        "helloasso.com",
+        "dev.helloasso.com",
+        "api.helloasso.com"
+      ],
+      "verification": {
+        "status": "NON_VERIFIE",
+        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
+      },
+      "officialApi": {
+        "status": "unknown"
+      },
+      "automation": {
+        "status": "unknown"
+      },
+      "queue": {
+        "status": "unknown"
+      },
+      "purchaseLimits": {
+        "status": "unknown"
+      },
+      "cart": {
+        "status": "unknown"
+      },
+      "clues": [
+        {
+          "url": "https://dev.helloasso.com/docs/introduction-%C3%A0-lapi-de-helloasso",
+          "note": "API officielle (OAuth2) ; le résumé indique un usage côté organisation (données de billetterie, checkout) — à établir.",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        },
+        {
+          "url": "https://dev.helloasso.com/reference/plus-billetterie-api",
+          "note": "API « Plus Billetterie ».",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        }
+      ]
+    },
+    {
+      "id": "la28",
+      "name": "LA28 (billetterie officielle)",
+      "regions": [
+        "US",
+        "International"
+      ],
+      "eventTypes": [
+        "grand-evenement",
+        "sport"
+      ],
+      "officialHosts": [
+        "la28.org",
+        "tickets.la28.org"
+      ],
+      "verification": {
+        "status": "NON_VERIFIE",
+        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
+      },
+      "officialApi": {
+        "status": "unknown"
+      },
+      "automation": {
+        "status": "unknown"
+      },
+      "queue": {
+        "status": "unknown"
+      },
+      "purchaseLimits": {
+        "status": "unknown"
+      },
+      "cart": {
+        "status": "unknown"
+      },
+      "clues": []
+    },
+    {
+      "id": "opera-de-paris",
+      "name": "Opéra national de Paris (billetterie propre)",
+      "regions": [
+        "FR"
+      ],
+      "eventTypes": [
+        "spectacle",
+        "theatre"
+      ],
+      "officialHosts": [
+        "operadeparis.fr"
+      ],
+      "verification": {
+        "status": "NON_VERIFIE",
+        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
+      },
+      "officialApi": {
+        "status": "unknown"
+      },
+      "automation": {
+        "status": "unknown"
+      },
+      "queue": {
+        "status": "unknown"
+      },
+      "purchaseLimits": {
+        "status": "unknown"
+      },
+      "cart": {
+        "status": "unknown"
+      },
+      "clues": []
+    },
+    {
+      "id": "roland-garros",
+      "name": "Roland-Garros / FFT (billetterie officielle)",
+      "regions": [
+        "FR"
+      ],
+      "eventTypes": [
+        "sport",
+        "grand-evenement"
+      ],
+      "officialHosts": [
+        "rolandgarros.com",
+        "tickets.rolandgarros.com",
+        "fft.fr",
+        "billetterie.fft.fr"
+      ],
+      "verification": {
+        "status": "NON_VERIFIE",
+        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
+      },
+      "officialApi": {
+        "status": "unknown"
+      },
+      "automation": {
+        "status": "unknown"
+      },
+      "queue": {
+        "status": "unknown"
+      },
+      "purchaseLimits": {
+        "status": "unknown"
+      },
+      "cart": {
+        "status": "unknown"
+      },
+      "clues": [
+        {
+          "url": "https://tickets.rolandgarros.com/fr/tout-savoir-tirage-au-sort",
+          "note": "Le résumé indique une vente par tirage au sort (pas de file d'attente classique) et des limites de billets par catégorie de sessions.",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        },
+        {
+          "url": "https://tickets.rolandgarros.com/fr/informations/general",
+          "note": "Informations billetterie.",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        }
+      ]
+    },
+    {
+      "id": "seatgeek",
+      "name": "SeatGeek",
+      "regions": [
+        "US"
+      ],
+      "eventTypes": [
+        "sport",
+        "concert",
+        "spectacle"
+      ],
+      "officialHosts": [
+        "seatgeek.com",
+        "platform.seatgeek.com"
+      ],
+      "verification": {
+        "status": "NON_VERIFIE",
+        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
+      },
+      "officialApi": {
+        "status": "unknown"
+      },
+      "automation": {
+        "status": "unknown"
+      },
+      "queue": {
+        "status": "unknown"
+      },
+      "purchaseLimits": {
+        "status": "unknown"
+      },
+      "cart": {
+        "status": "unknown"
+      },
+      "clues": []
+    },
+    {
+      "id": "seetickets",
+      "name": "See Tickets (Eventim group)",
+      "regions": [
+        "UK",
+        "FR",
+        "International"
+      ],
+      "eventTypes": [
+        "concert",
+        "festival"
+      ],
+      "officialHosts": [
+        "seetickets.com",
+        "seetickets.us",
+        "misc.seetickets.us",
+        "support.seetickets.us",
+        "group.seetickets.com"
+      ],
+      "verification": {
+        "status": "NON_VERIFIE",
+        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
+      },
+      "officialApi": {
+        "status": "unknown"
+      },
+      "automation": {
+        "status": "unknown"
+      },
+      "queue": {
+        "status": "unknown"
+      },
+      "purchaseLimits": {
+        "status": "unknown"
+      },
+      "cart": {
+        "status": "unknown"
+      },
+      "clues": [
+        {
+          "url": "https://www.seetickets.com/Content/Terms-and-Conditions",
+          "note": "Conditions générales ; le résumé ne mentionne ni robots ni limites d'achat.",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        }
+      ]
+    },
+    {
+      "id": "shotgun",
+      "name": "Shotgun",
+      "regions": [
+        "FR",
+        "Europe"
+      ],
+      "eventTypes": [
+        "concert",
+        "festival"
+      ],
+      "officialHosts": [
+        "shotgun.live",
+        "support.shotgun.live",
+        "support-pro.shotgun.live",
+        "pro.shotgun.live"
+      ],
+      "verification": {
+        "status": "NON_VERIFIE",
+        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
+      },
+      "officialApi": {
+        "status": "unknown"
+      },
+      "automation": {
+        "status": "unknown"
+      },
+      "queue": {
+        "status": "unknown"
+      },
+      "purchaseLimits": {
+        "status": "unknown"
+      },
+      "cart": {
+        "status": "unknown"
+      },
+      "clues": [
+        {
+          "url": "https://support.shotgun.live/hc/en-us/articles/14330476029330--General-Terms-and-Conditions",
+          "note": "Conditions générales d'utilisation ; le résumé n'en donne pas le contenu sur les robots.",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        }
+      ]
+    },
+    {
+      "id": "stubhub",
+      "name": "StubHub (revente)",
+      "regions": [
+        "International"
+      ],
+      "eventTypes": [
+        "revente",
+        "concert",
+        "sport"
+      ],
+      "officialHosts": [
+        "stubhub.com",
+        "stubhub.fr"
+      ],
+      "verification": {
+        "status": "NON_VERIFIE",
+        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
+      },
+      "officialApi": {
+        "status": "unknown"
+      },
+      "automation": {
+        "status": "unknown"
+      },
+      "queue": {
+        "status": "unknown"
+      },
+      "purchaseLimits": {
+        "status": "unknown"
+      },
+      "cart": {
+        "status": "unknown"
+      },
+      "clues": []
+    },
+    {
+      "id": "ticketmaster",
+      "name": "Ticketmaster",
+      "regions": [
+        "FR",
+        "BE",
+        "CH",
+        "International"
+      ],
+      "eventTypes": [
+        "concert",
+        "sport",
+        "spectacle",
+        "theatre",
+        "festival"
+      ],
+      "officialHosts": [
+        "ticketmaster.com",
+        "ticketmaster.fr",
+        "ticketmaster.be",
+        "ticketmaster.ch",
+        "developer.ticketmaster.com",
+        "am.ticketmaster.com",
+        "blog.ticketmaster.com"
+      ],
+      "verification": {
+        "status": "NON_VERIFIE",
+        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
+      },
+      "officialApi": {
+        "status": "unknown"
+      },
+      "automation": {
+        "status": "unknown"
+      },
+      "queue": {
+        "status": "unknown"
+      },
+      "purchaseLimits": {
+        "status": "unknown"
+      },
+      "cart": {
+        "status": "unknown"
+      },
+      "clues": [
+        {
+          "url": "https://developer.ticketmaster.com/products-and-docs/apis/discovery-api/v2/",
+          "note": "Le résumé indique que la Discovery API permet de rechercher événements, artistes et lieux.",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        },
+        {
+          "url": "https://developer.ticketmaster.com/products-and-docs/apis/partner/",
+          "note": "Le résumé indique que la Partner API (réserver/acheter) n'est PAS ouverte : réservée aux entreprises ayant une relation officielle de distribution.",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        },
+        {
+          "url": "https://developer.ticketmaster.com/products-and-docs/apis/getting-started/",
+          "note": "Présentation des API (Discovery, Commerce…) ; périmètre exact d'accès à établir.",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        },
+        {
+          "url": "https://www.ticketmaster.be/help/terms.html?language=fr-be",
+          "note": "Le résumé indique une interdiction des robots/spiders et du contrôle automatique du site (version belge ; la version française est à identifier).",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        }
+      ]
+    },
+    {
+      "id": "ticketswap",
+      "name": "TicketSwap (revente)",
+      "regions": [
+        "International"
+      ],
+      "eventTypes": [
+        "revente",
+        "concert",
+        "festival"
+      ],
+      "officialHosts": [
+        "ticketswap.com",
+        "ticketswap.fr"
+      ],
+      "verification": {
+        "status": "NON_VERIFIE",
+        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
+      },
+      "officialApi": {
+        "status": "unknown"
+      },
+      "automation": {
+        "status": "unknown"
+      },
+      "queue": {
+        "status": "unknown"
+      },
+      "purchaseLimits": {
+        "status": "unknown"
+      },
+      "cart": {
+        "status": "unknown"
+      },
+      "clues": []
+    },
+    {
+      "id": "uefa",
+      "name": "UEFA (billetterie officielle)",
+      "regions": [
+        "International"
+      ],
+      "eventTypes": [
+        "sport",
+        "grand-evenement"
+      ],
+      "officialHosts": [
+        "uefa.com",
+        "tickets.uefa.com",
+        "editorial.uefa.com",
+        "documents.uefa.com"
+      ],
+      "verification": {
+        "status": "NON_VERIFIE",
+        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
+      },
+      "officialApi": {
+        "status": "unknown"
+      },
+      "automation": {
+        "status": "unknown"
+      },
+      "queue": {
+        "status": "unknown"
+      },
+      "purchaseLimits": {
+        "status": "unknown"
+      },
+      "cart": {
+        "status": "unknown"
+      },
+      "clues": [
+        {
+          "url": "https://www.uefa.com/euro2028/news/02a0-1f55506ebc73-bd595aa88468-1000--uefa-euro-2028-puts-fans-first-with-fair-and-transparent-/",
+          "note": "Le résumé indique un tirage/ballot pour l'EURO 2028 (sans file d'attente) ; candidatures multiples interdites dans les conditions des éditions précédentes.",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        },
+        {
+          "url": "https://www.uefa.com/tickets/",
+          "note": "Portail billetterie UEFA.",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        }
+      ]
+    },
+    {
+      "id": "viagogo",
+      "name": "Viagogo (revente)",
+      "regions": [
+        "International"
+      ],
+      "eventTypes": [
+        "revente",
+        "concert",
+        "sport"
+      ],
+      "officialHosts": [
+        "viagogo.com",
+        "viagogo.fr"
+      ],
+      "verification": {
+        "status": "NON_VERIFIE",
+        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
+      },
+      "officialApi": {
+        "status": "unknown"
+      },
+      "automation": {
+        "status": "unknown"
+      },
+      "queue": {
+        "status": "unknown"
+      },
+      "purchaseLimits": {
+        "status": "unknown"
+      },
+      "cart": {
+        "status": "unknown"
+      },
+      "clues": []
+    },
+    {
+      "id": "weezevent",
+      "name": "Weezevent",
+      "regions": [
+        "FR",
+        "International"
+      ],
+      "eventTypes": [
+        "festival",
+        "associatif",
+        "concert",
+        "spectacle"
+      ],
+      "officialHosts": [
+        "weezevent.com",
+        "api.weezevent.com",
+        "docapi.weezevent.com",
+        "aide.weezevent.com",
+        "support.weezevent.com",
+        "help.weezevent.com"
+      ],
+      "verification": {
+        "status": "NON_VERIFIE",
+        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
+      },
+      "officialApi": {
+        "status": "unknown"
+      },
+      "automation": {
+        "status": "unknown"
+      },
+      "queue": {
+        "status": "unknown"
+      },
+      "purchaseLimits": {
+        "status": "unknown"
+      },
+      "cart": {
+        "status": "unknown"
+      },
+      "clues": [
+        {
+          "url": "https://api.weezevent.com/",
+          "note": "Le résumé indique une API réservée aux partenaires enregistrés (clé délivrée par Weezevent), côté billetterie organisateur.",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        },
+        {
+          "url": "https://weezevent.com/fr-ca/cgus/",
+          "note": "Conditions générales d'utilisation des services.",
+          "verified": false,
+          "origin": "résumé de recherche web — page officielle NON lue"
+        }
+      ]
+    },
+    {
+      "id": "yurplan",
+      "name": "Yurplan",
+      "regions": [
+        "FR"
+      ],
+      "eventTypes": [
+        "festival",
+        "associatif",
+        "concert"
+      ],
+      "officialHosts": [
+        "yurplan.com"
+      ],
+      "verification": {
+        "status": "NON_VERIFIE",
+        "note": "Sources officielles inaccessibles depuis l'environnement d'étude (politique réseau) : rien n'a été lu ni vérifié."
+      },
+      "officialApi": {
+        "status": "unknown"
+      },
+      "automation": {
+        "status": "unknown"
+      },
+      "queue": {
+        "status": "unknown"
+      },
+      "purchaseLimits": {
+        "status": "unknown"
+      },
+      "cart": {
+        "status": "unknown"
+      },
+      "clues": []
+    }
+  ]
+}

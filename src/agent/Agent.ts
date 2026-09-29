@@ -1,5 +1,7 @@
 import type { BotConfig } from "../config/schema.js";
 import { notify } from "../notifications/notify.js";
+import { assertAuthorized } from "../platforms/authorize.js";
+import { loadCatalog, type Catalog } from "../platforms/catalog.js";
 import { assertCompliant } from "../sites/compliance.js";
 import type { AdapterContext, Blocker, CartSummary, Offer, SaleSnapshot, SiteAdapter } from "../sites/SiteAdapter.js";
 import { sanitize, Telemetry, type TelemetryRecord } from "../telemetry/Telemetry.js";
@@ -62,6 +64,8 @@ export interface AgentDeps {
   awaitHuman?: (blocker: Blocker) => Promise<void>;
   /** Attente de la confirmation humaine (Entrée). Remplaçable pour tester la vraie attente. */
   waitForEnter?: typeof waitForEnter;
+  /** Catalogue des plateformes (par défaut platforms/catalog.json, chargé seulement pour un adaptateur non-démo). */
+  catalog?: Catalog;
 }
 
 type BuildExtra = Partial<Pick<RunResult, "failureReason" | "offer" | "cart" | "cartOk" | "problems" | "blocker">>;
@@ -142,6 +146,9 @@ export class Agent {
   async run(): Promise<RunResult> {
     const { adapter } = this.d;
     assertCompliant(adapter.meta, adapter.resolveEventUrl(this.d.config)); // refus avant toute action
+    // Tout adaptateur non-démo doit correspondre à une plateforme dont les PREUVES officielles autorisent son canal.
+    const catalog = this.d.catalog ?? (adapter.meta.compliance.policy === "demo" ? undefined : loadCatalog());
+    if (catalog) assertAuthorized(adapter.meta, catalog);
     let result: RunResult;
     try {
       result = await this.execute();

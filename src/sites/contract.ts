@@ -1,5 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { authorizeAdapter } from "../platforms/authorize.js";
+import type { Catalog } from "../platforms/catalog.js";
 import { assertCompliant } from "./compliance.js";
 import type { SiteAdapter } from "./SiteAdapter.js";
 
@@ -43,7 +45,7 @@ export function scanSource(source: string): ContractIssue[] {
 }
 
 /** Vérifie qu'un adaptateur respecte le contrat SiteAdapter et les garde-fous de la plateforme. */
-export function checkAdapterContract(adapter: SiteAdapter, opts: { sourceFile?: string; now?: number } = {}): ContractIssue[] {
+export function checkAdapterContract(adapter: SiteAdapter, opts: { sourceFile?: string; now?: number; catalog?: Catalog } = {}): ContractIssue[] {
   const issues: ContractIssue[] = [];
   const err = (code: string, message: string): void => void issues.push({ severity: "error", code, message });
   const warn = (code: string, message: string): void => void issues.push({ severity: "warning", code, message });
@@ -73,6 +75,14 @@ export function checkAdapterContract(adapter: SiteAdapter, opts: { sourceFile?: 
   } catch (e) {
     err("COMPLIANCE", (e as Error).message.replace(/^Adaptateur « [^»]+ » refusé : /, ""));
   }
+
+  // Autorisation par le catalogue des plateformes : pas de preuve officielle → pas d'adaptateur exécutable.
+  if (opts.catalog && meta.compliance?.policy && meta.compliance.policy !== "demo") {
+    const auth = authorizeAdapter(meta, opts.catalog, opts.now);
+    if (!auth.ok) err("PLATFORM_AUTH", auth.reason ?? "plateforme non autorisée");
+  }
+  const req = meta.requires?.env;
+  if (req && (!Array.isArray(req) || req.some((k) => !/^[A-Z][A-Z0-9_]*$/.test(k)))) err("REQUIRES_ENV", "meta.requires.env : noms de variables en MAJUSCULES (jamais de valeur dans le code)");
 
   const patterns = adapter.paymentUrlPatterns;
   if (!Array.isArray(patterns) || patterns.length === 0) err("PAYMENT_GUARD", "paymentUrlPatterns vide : le garde-fou de paiement serait inactif");

@@ -23,6 +23,12 @@ Sommaire : [0. Autorisation](#0-avant-tout-code--lautorisation-bloquant) · [1. 
 
 ## 0. Avant tout code : l'autorisation (bloquant)
 
+**La décision se consigne d'abord dans le catalogue des plateformes** (`platforms/catalog.json`, voir
+[PLATFORMS.md](PLATFORMS.md)), avec des **preuves officielles datées** (URL sur un domaine officiel de la plateforme,
+date, passage cité). Le cœur déduit un *verdict* de ces preuves et **refuse** tout adaptateur dont la plateforme n'est pas
+vérifiée ou dont le canal n'est pas autorisé : pas de preuve, pas d'exécution. `npm run platforms` affiche l'état ;
+`npm run platforms -- --check` refuse qu'un adaptateur existe pour une plateforme `NON VÉRIFIÉ` / `NON AUTORISÉ`.
+
 Répondez d'abord à ces questions **en lisant les documents du site** (CGU, règles d'achat, conditions
 générales de vente, page développeur/partenaires) :
 
@@ -42,6 +48,11 @@ ouverte) puis achat à la main, liste d'attente ou revente officielle du site.
 Cette décision est **enregistrée dans le code** (`meta.compliance`, §2) et **appliquée par le cœur** : sans
 déclaration valide et relue depuis moins de 180 jours, le cœur refuse de démarrer l'adaptateur.
 Ce garde-fou force une décision explicite site par site ; ce n'est pas un avis juridique.
+
+**Un adaptateur par canal.** Pour une plateforme qui autorise à la fois l'API et l'interface, écrivez deux adaptateurs
+(`MonSiteApi.ts` avec `channel: "official-api"`, `MonSiteWeb.ts` avec `channel: "browser"`) ayant le même `platform`. Le cœur
+choisit seul : API officielle si elle est autorisée et si ses prérequis sont là, sinon navigateur si l'interface est
+explicitement autorisée, sinon intervention humaine (rappels, aucun contact avec le site).
 
 ## 1. Générer le squelette
 
@@ -67,6 +78,9 @@ sans argument, et son `meta.id` est unique (`[a-z0-9-]+`). Les noms `SiteAdapter
 readonly meta: AdapterMeta = {
   id: "mon-site",
   displayName: "Mon Site",
+  platform: "mon-site",                 // entrée du catalogue (défaut : id). Une plateforme peut avoir un adaptateur par canal.
+  channel: "official-api",              // "official-api" | "browser" (défaut : déduit de capabilities.officialApi)
+  requires: { env: ["MONSITE_API_KEY"] }, // variables d'environnement nécessaires (noms seulement, jamais de valeur) ; absentes → canal suivant
   compliance: {
     policy: "official-api",                       // "official-api" | "permitted-by-terms" | "demo"
     termsUrl: "https://…/conditions",             // https obligatoire : la page qui fonde la décision

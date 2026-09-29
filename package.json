@@ -23,7 +23,8 @@
     "stats": "tsx src/index.ts stats",
     "test:adapters": "node --import tsx --test tests/adapters.contract.test.ts",
     "new-site": "tsx scripts/new-site.ts",
-    "test:stress": "node --import tsx --test tests/stress/*.test.ts"
+    "test:stress": "node --import tsx --test tests/stress/*.test.ts",
+    "platforms": "tsx src/index.ts platforms"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",

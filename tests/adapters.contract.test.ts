@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { loadCatalog } from "../src/platforms/catalog.js";
 import { checkAdapterContract } from "../src/sites/contract.js";
 import { discoverAdapterEntries } from "../src/sites/registry.js";
 
@@ -17,7 +18,7 @@ test("au moins un adaptateur est découvert et les identifiants sont uniques", (
 
 for (const { adapter, file } of entries) {
   test(`contrat « ${adapter.meta.id} » : méthodes, capacités, autorisation, garde-fou de paiement, code source`, () => {
-    const issues = checkAdapterContract(adapter, { sourceFile: file });
+    const issues = checkAdapterContract(adapter, { sourceFile: file, catalog: loadCatalog() });
     const errors = issues.filter((i) => i.severity === "error");
     assert.deepEqual(errors.map((e) => `[${e.code}] ${e.message}`), []);
   });

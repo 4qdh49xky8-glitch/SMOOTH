@@ -4,6 +4,7 @@ import { parseArgs } from "node:util";
 import { liveCommand } from "./cli/live.js";
 import { simulateCommand } from "./cli/simulate.js";
 import { sitesCommand } from "./cli/sites.js";
+import { platformsCommand } from "./cli/platforms.js";
 import { statsCommand } from "./cli/stats.js";
 import { validateCommand } from "./cli/validate.js";
 import { listProfiles, PROFILES_DIR } from "./config/load.js";
@@ -17,6 +18,8 @@ Adaptateurs et configuration
   validate [fichier|profil]      Valide une configuration sans contacter aucun site                    (npm run validate -- config/event.json)
   validate --all                 Valide tous les profils de ${PROFILES_DIR}/
   profiles                       Liste les profils disponibles
+  platforms                      Tableau interne des plateformes candidates (preuves officielles, verdicts)  (npm run platforms)
+                                 --check : cohérence du catalogue · --hosts : domaines officiels à autoriser · --json
 
 Exécution
   run                            Attend l'ouverture, met au panier, notifie, s'arrête avant le paiement (npm start)
@@ -45,6 +48,9 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       trace: { type: "boolean", default: false },
       "exit-when-done": { type: "boolean", default: false },
       mode: { type: "string" },
+      check: { type: "boolean", default: false },
+      hosts: { type: "boolean", default: false },
+      markdown: { type: "boolean", default: false },
     },
   });
   const [command, arg] = positionals;
@@ -55,6 +61,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
       return sitesCommand({ json: values.json });
     case "validate":
       return validateCommand(target, { all: values.all, json: values.json });
+    case "platforms":
+      return platformsCommand({ json: values.json, check: values.check, hosts: values.hosts, markdown: values.markdown });
     case "profiles": {
       const names = listProfiles();
       for (const n of names) {

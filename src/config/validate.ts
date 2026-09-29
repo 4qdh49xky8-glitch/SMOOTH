@@ -1,6 +1,8 @@
 import { normalize } from "../agent/matcher.js";
 import { assertCompliant } from "../sites/compliance.js";
 import { checkAdapterContract } from "../sites/contract.js";
+import { resolveChannel, type ChannelDecision } from "../agent/channels.js";
+import { loadCatalog, findPlatform, type Catalog } from "../platforms/catalog.js";
 import { discoverAdapters } from "../sites/registry.js";
 import type { SiteAdapter } from "../sites/SiteAdapter.js";
 import { basename } from "node:path";
@@ -21,6 +23,7 @@ export interface ValidateOptions {
   now?: number;
   adapters?: SiteAdapter[];
   env?: NodeJS.ProcessEnv;
+  catalog?: Catalog;
 }
 
 /**
@@ -53,10 +56,25 @@ export async function validateConfig(target: string, opts: ValidateOptions = {})
 
   // — Adaptateur
   const adapters = opts.adapters ?? (await discoverAdapters());
-  const adapter = adapters.find((a) => a.meta.id === cfg.site);
-  if (!adapter) {
-    errors.push(`site « ${cfg.site} » : aucun adaptateur. Disponibles : ${adapters.map((a) => a.meta.id).join(", ") || "(aucun)"}`);
-  } else {
+  const catalog = opts.catalog ?? loadCatalog();
+  let decision: ChannelDecision | undefined;
+  try {
+    decision = resolveChannel({ platform: cfg.site, adapters, catalog, env, config: cfg, now });
+  } catch (e) {
+    errors.push((e as Error).message); // canal forcé indisponible
+  }
+  const known = adapters.some((a) => a.meta.id === cfg.site || (a.meta.platform ?? a.meta.id) === cfg.site) || findPlatform(catalog, cfg.site) !== undefined;
+  if (decision) {
+    info.push(`canal retenu : ${decision.channel}${decision.adapter ? ` (adaptateur « ${decision.adapter.meta.id} »)` : ""} — ${decision.reasons.join("; ")}`);
+    for (const r of decision.rejected) info.push(`canal écarté : ${r.adapter} (${r.channel}) — ${r.reason}`);
+  }
+  if (decision?.channel === "human" && known) {
+    warnings.push("canal humain : aucune automatisation n'est disponible/autorisée pour cette plateforme ; le bot se limitera à des rappels (aucun contact avec le site).");
+  }
+  const adapter = decision?.adapter;
+  if (!known) {
+    errors.push(`site « ${cfg.site} » : aucun adaptateur et absent du catalogue des plateformes. Adaptateurs : ${adapters.map((a) => a.meta.id).join(", ") || "(aucun)"}`);
+  } else if (adapter) {
     const caps = adapter.meta.capabilities;
     let url: string | undefined;
     try {
