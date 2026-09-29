@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { migrateLegacyConfig } from "../src/config/load.js";
 import { ConfigSchema } from "../src/config/schema.js";
 import { Clock, estimateOffset } from "../src/utils/clock.js";
 import { looksLikePayment } from "../src/agent/claude.js";
@@ -19,11 +20,22 @@ test("l'horloge suit le décalage serveur estimé", async () => {
   assert.ok(Math.abs(new Clock(est.offsetMs).now() - (Date.now() + skew)) < 20);
 });
 
-test("la config refuse autoPayment=true et un saleTime sans fuseau", () => {
-  const ok = { event: "e", saleTime: "2026-10-01T10:00:00+02:00", quantity: 2, maxPricePerTicket: 150, categories: ["a"] };
+test("la config refuse autoPayment=true et un startTime sans fuseau", () => {
+  const ok = { site: "example", event: { name: "e" }, sale: { startTime: "2026-10-01T10:00:00+02:00" }, tickets: { quantity: 2, maxPricePerTicket: 150 } };
   assert.equal(ConfigSchema.safeParse(ok).success, true);
-  assert.equal(ConfigSchema.safeParse({ ...ok, autoPayment: true }).success, false);
-  assert.equal(ConfigSchema.safeParse({ ...ok, saleTime: "2026-10-01T10:00:00" }).success, false);
+  assert.equal(ConfigSchema.safeParse({ ...ok, behavior: { autoPayment: true } }).success, false);
+  assert.equal(ConfigSchema.safeParse({ ...ok, sale: { startTime: "2026-10-01T10:00:00" } }).success, false);
+  assert.deepEqual(ConfigSchema.parse(ok).tickets.categories, []); // vide = toutes
+});
+
+test("l'ancien format plat est migré", () => {
+  const legacy = { event: "Ancien", saleTime: "2026-10-01T10:00:00+02:00", quantity: 2, maxPricePerTicket: 150, categories: ["A"], seatsTogether: true, autoAddToCart: true, autoPayment: false };
+  const cfg = ConfigSchema.parse(migrateLegacyConfig(legacy));
+  assert.equal(cfg.event.name, "Ancien");
+  assert.equal(cfg.sale.startTime, legacy.saleTime);
+  assert.equal(cfg.tickets.quantity, 2);
+  assert.equal(cfg.site, "example");
+  assert.equal(ConfigSchema.safeParse(migrateLegacyConfig({ ...legacy, autoPayment: true })).success, false);
 });
 
 test("détection d'éléments de paiement", () => {

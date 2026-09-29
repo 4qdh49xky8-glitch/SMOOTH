@@ -15,6 +15,8 @@ const SCRIPT = `(() => {
   const t = (document.body && document.body.innerText || '').slice(0, 3000).toLowerCase();
   if (/(file d.attente|waiting room|you are in line|vous êtes dans la file|queue-it)/.test(t))
     return { kind: 'queue', message: 'File d\\'attente virtuelle (texte détecté)' };
+  if (/(limite de \d+ billets?|limite d.achat|quantité maximale|maximum (of )?\d+ tickets|ticket limit|purchase limit|limit of \d+ tickets)/.test(t))
+    return { kind: 'purchase-limit', message: 'Limite d\'achat atteinte sur ce site' };
   if (/(are you a robot|êtes-vous un robot|vérification de sécurité|verify you are human|access denied|unusual traffic|trafic inhabituel)/.test(t))
     return { kind: 'anti-bot', message: 'Contrôle anti-bot / accès refusé' };
   return null;

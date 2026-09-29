@@ -16,39 +16,66 @@ au panier, vous notifie, et laisse le navigateur ouvert pour que vous vérifiiez
   billetteries interdisent l'automatisation et certaines législations encadrent les bots d'achat : n'écrivez
   un adaptateur que pour un site qui l'autorise, avec votre propre compte et votre propre moyen de paiement.
 
-## Architecture
+## Architecture générique
+
+Un seul cœur, des adaptateurs indépendants :
+
+```
+Core Agent ──▶ Event Configuration ──▶ SiteAdapter ──▶ Navigateur / API officielle
+   │                                        │
+   │   horloge · déclenchement précis       ├─ fetchSale      disponibilité + offres (léger)
+   │   matching déterministe des offres     ├─ selectOffer / selectSeats
+   │   gestion des blocages (cession/arrêt) ├─ addToCart      ──▶ ARRÊT avant paiement
+   └─ notification · mesure de latence      └─ detectBlocker  file · CAPTCHA · anti-bot · limite
+```
 
 ```
 src/
-  index.ts                 CLI : run | login | check
-  config/  schema.ts load.ts       Validation zod du JSON (autoPayment=false forcé, saleTime avec fuseau)
-  sites/   SiteAdapter.ts          Interface à implémenter par site
-           ExampleSite.ts          Adaptateur de référence (site démo)
-           registry.ts             id de site → adaptateur
-  browser/ launch.ts               Chromium indépendant + CDP (survit au bot → reprise manuelle)
-           cdp.ts                  Blocage images/analytics (CDP), traçage réseau
-           guards.ts               Blocage des pages de paiement pendant la course
-  agent/   Agent.ts                Orchestration : horloge → login → GO → surveillance → panier → notif
-           matcher.ts              Filtre/classement déterministe des offres (aucun LLM)
-           claude.ts               Assistant Claude : réparation de sélecteur + diagnostic (secours uniquement)
-  selectors/ resolver.ts           Locators robustes (.or), cache des sélecteurs réparés
-             blockers.ts           Détection CAPTCHA/file d'attente/anti-bot (lecture seule)
-             example.ts            Sélecteurs de l'adaptateur démo
-  notifications/ notify.ts         Terminal + bip + notif OS + webhook optionnel
+  index.ts                 CLI : run | login | check | --list-sites
+  config/  schema.ts load.ts       Config générique (event/sale/tickets/behavior), migration de l'ancien format
+  sites/   SiteAdapter.ts          Contrat (meta, capacités, conformité, méthodes)
+           BaseSiteAdapter.ts      Comportements par défaut sûrs (connexion manuelle, blocages, paiement)
+           compliance.ts           Refus d'un adaptateur sans base d'autorisation valide et récente
+           registry.ts             Découverte AUTOMATIQUE de src/sites/*.ts (aucun enregistrement manuel)
+           ExampleSite.ts          Seul adaptateur fourni (démo locale, limité à localhost)
+  browser/ launch.ts cdp.ts guards.ts   Chromium indépendant + CDP, blocage réseau, garde-fou paiement
+  agent/   Agent.ts matcher.ts claude.ts
+  selectors/ resolver.ts blockers.ts example.ts
+  notifications/ notify.ts
   utils/   clock.ts scheduler.ts timing.ts logger.ts errors.ts prompt.ts
-demo/server.ts             Site de billetterie factice (login, vente programmée, panier, contention, file d'attente)
-scripts/demo.ts            Test de bout en bout automatisé
-tests/                     Tests unitaires (matching, horloge, scheduler, config)
-config/event.example.json  Configuration exemple
+docs/ADDING_A_SITE.md      Guide pas à pas + checklist d'autorisation
+demo/ scripts/ tests/      Site factice, E2E, tests (cœur avec faux adaptateur, contrat d'adaptateur, config…)
 ```
 
-Flux : `T − preArm` login + chargement + connexions chaudes → recalage d'horloge → attente précise
-(setTimeout puis spin `setImmediate`) → **GO** à `saleTime` → `fetchSale` (HTTP léger) → `rankOffers` →
-`selectOffer` → `addToCart` → `readCart` → notification → arrêt (le navigateur reste ouvert).
-Si l'offre est vendue entre-temps, passage automatique à la suivante (`cart.maxAttempts`).
+**Ajouter un site = déposer `src/sites/MonSite.ts`** (export par défaut) : ni le cœur ni le registre ne changent.
+Aucun adaptateur de site réel n'est fourni volontairement : il n'en existe qu'après vérification que le site
+l'autorise (voir `docs/ADDING_A_SITE.md`).
 
-Classement des offres : côte à côte d'abord (si `seatsTogether`), puis ordre des catégories du fichier
-(= ordre de préférence), puis prix croissant. `seatsTogetherStrict: true` écarte les offres non confirmées.
+### Configuration générique
+
+```json
+{
+  "site": "example",
+  "event": { "name": "Nom de l'événement", "date": "2026-12-01", "url": "http://127.0.0.1:4173/event" },
+  "sale": { "startTime": "2026-10-01T10:00:00+02:00" },
+  "tickets": { "quantity": 2, "maxPricePerTicket": 150, "categories": [], "seatsTogether": true },
+  "behavior": { "autoAddToCart": true, "autoPayment": false }
+}
+```
+`categories: []` = toutes les catégories ; sinon l'ordre est la préférence. `siteOptions` transmet des réglages
+propres à l'adaptateur. L'ancien format plat (V1) est migré automatiquement. `autoPayment: true` est refusé.
+
+### États bloquants (identiques pour tous les sites)
+
+| État | Réaction du cœur |
+|------|------------------|
+| `queue`, `captcha`, `anti-bot` | Le bot cesse toute action, notifie ; reprise à la disparition (détection) ou Entrée |
+| `login-required`, `human-step` (plan de salle…) | Cession de la main jusqu'à Entrée |
+| `purchase-limit` | **Arrêt définitif** (`status: "blocked"`), jamais contourné |
+
+Flux : `T − preArm` login (manuel) + chargement → recalage d'horloge → attente précise → **GO** à `sale.startTime`
+→ `fetchSale` → `rankOffers` (côte à côte → ordre des catégories → prix) → `selectOffer` (`selectSeats`) → `addToCart`
+→ `readCart` → notification → arrêt (navigateur ouvert pour le paiement manuel).
 
 ## Installation
 
@@ -63,7 +90,8 @@ cp config/event.example.json config/event.json
 
 ```bash
 npm run login      # 1 fois : connectez-vous à la main dans la fenêtre (session conservée dans .profile)
-npm run check      # valide la config + mesure décalage d'horloge / RTT
+npm run check      # valide config + conformité de l'adaptateur + décalage d'horloge / RTT
+npm run check -- --list-sites   # adaptateurs découverts
 npm start          # attend l'ouverture, met au panier, notifie, s'arrête
 npm start -- --trace   # + journal des requêtes lentes (DNS/connect/TTFB)
 ```
@@ -112,10 +140,8 @@ documentée et autorisée, `pollIntervalMs` réduit seulement si le site l'autor
 
 ## Écrire un adaptateur pour un nouveau site
 
-1. Copiez `src/sites/ExampleSite.ts` → `src/sites/MonSite.ts` et implémentez `SiteAdapter`.
-2. Ajoutez ses sélecteurs dans `src/selectors/monsite.ts` (`SelectorSpec` : nom, description, candidats).
-3. Enregistrez-le dans `src/sites/registry.ts` et mettez `"site": "monsite"` dans la config.
-4. Renseignez ses `paymentUrlPatterns` (garde-fou) et laissez `detectBlocker` signaler file/CAPTCHA.
+Voir **[docs/ADDING_A_SITE.md](docs/ADDING_A_SITE.md)** : autorisation d'abord (API officielle prioritaire, CGU relues),
+puis un fichier, des sélecteurs, des tests sur pages enregistrées. Le contrat commun est testé automatiquement.
 
 ## Gérer les changements de structure d'un site
 

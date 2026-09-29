@@ -1,6 +1,7 @@
 import type { BotConfig } from "../config/schema.js";
 import { notify } from "../notifications/notify.js";
-import type { AdapterContext, Blocker, CartSummary, Offer, SiteAdapter } from "../sites/SiteAdapter.js";
+import { assertCompliant } from "../sites/compliance.js";
+import { AUTO_DETECTABLE, type AdapterContext, type Blocker, type CartSummary, type Offer, type SiteAdapter } from "../sites/SiteAdapter.js";
 import { Clock, estimateOffset, httpDateServerTime } from "../utils/clock.js";
 import {
   BlockerError,
@@ -8,6 +9,7 @@ import {
   OfferUnavailableError,
   RateLimitedError,
   SelectorNotFoundError,
+  StopRunError,
 } from "../utils/errors.js";
 import type { Logger } from "../utils/logger.js";
 import { waitForEnter } from "../utils/prompt.js";
@@ -16,7 +18,7 @@ import { LatencyTracker } from "../utils/timing.js";
 import type { ClaudeAssistant } from "./claude.js";
 import { rankOffers, verifyCart } from "./matcher.js";
 
-export type RunStatus = "in-cart" | "ready-not-added" | "sale-timeout";
+export type RunStatus = "in-cart" | "ready-not-added" | "sale-timeout" | "blocked";
 
 export interface RunResult {
   status: RunStatus;
@@ -24,6 +26,8 @@ export interface RunResult {
   cart?: CartSummary;
   cartOk?: boolean;
   problems?: string[];
+  /** Renseigné quand status = "blocked" (ex. limite d'achat). */
+  blocker?: Blocker;
   timeline: ReturnType<LatencyTracker["report"]>;
 }
 
@@ -38,6 +42,9 @@ export interface AgentDeps {
   onArmed?: () => Promise<void>;
   /** Appelé à la fin (ex. : lever le garde-fou de paiement et le filtrage réseau). */
   onFinish?: () => Promise<void>;
+  /** Remplaçables (tests, autres interfaces) ; par défaut : notification OS/terminal et attente dans le terminal. */
+  notifier?: typeof notify;
+  awaitHuman?: (blocker: Blocker) => Promise<void>;
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -45,15 +52,38 @@ const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms
 export class Agent {
   private readonly saleEpochMs: number;
   private readonly latency: LatencyTracker;
+  /** Exposé pour les tests. */
+  readonly d: AgentDeps;
 
-  constructor(private readonly d: AgentDeps) {
-    this.saleEpochMs = Date.parse(d.config.saleTime);
+  constructor(d: AgentDeps) {
+    this.d = d;
+    this.saleEpochMs = Date.parse(d.config.sale.startTime);
     this.latency = new LatencyTracker(d.clock, this.saleEpochMs);
   }
 
+  private notify(o: Parameters<typeof notify>[0]): Promise<void> {
+    return (this.d.notifier ?? notify)(o);
+  }
+
   async run(): Promise<RunResult> {
+    const { adapter, log } = this.d;
+    assertCompliant(adapter.meta, adapter.resolveEventUrl(this.d.config)); // refus avant toute action
+    try {
+      const result = await this.execute();
+      await this.finish(result);
+      return result;
+    } catch (err) {
+      if (!(err instanceof StopRunError)) throw err;
+      log.error(err.message);
+      const result: RunResult = { status: "blocked", blocker: err.blocker, timeline: this.latency.report() };
+      await this.finish(result);
+      return result;
+    }
+  }
+
+  private async execute(): Promise<RunResult> {
     const { config, adapter, ctx, log, clock } = this.d;
-    log.info(`Événement « ${config.event} » — ouverture ${config.saleTime} — site « ${adapter.id} »`);
+    log.info(`Événement « ${config.event.name} » — ouverture ${config.sale.startTime} — site « ${adapter.meta.id} »`);
 
     await this.syncClock();
 
@@ -80,9 +110,7 @@ export class Agent {
     log.info(`GO (dépassement de l'horloge : ${overshoot.toFixed(1)} ms)`);
 
     // Phase 3 : surveillance + tentatives.
-    const result = await this.watchAndBuy();
-    await this.finish(result);
-    return result;
+    return this.watchAndBuy();
   }
 
   /** Synchronise l'horloge avec le serveur du site (heure précise si exposée, sinon en-tête Date). */
@@ -132,7 +160,7 @@ export class Agent {
           this.latency.mark("sale-detected");
           log.info("Vente détectée ouverte.");
         }
-        const ranked = rankOffers(snapshot.offers, config);
+        const ranked = rankOffers(snapshot.offers, config.tickets);
         const summary = `${snapshot.offers.length} offres, ${ranked.length} correspondent`;
         if (summary !== lastSummary) {
           lastSummary = summary;
@@ -162,7 +190,7 @@ export class Agent {
       if (wait > 0) await sleep(wait);
     }
 
-    await notify({
+    await this.notify({
       title: "⏱️ Aucun panier obtenu",
       message: "Aucune offre correspondant à vos critères n'a pu être ajoutée dans le temps imparti.",
       ...config.notifications,
@@ -173,10 +201,11 @@ export class Agent {
   private async tryOffer(offer: Offer): Promise<RunResult | null> {
     const { config, adapter, ctx, log } = this.d;
     log.info(`Tentative : ${offer.category} · ${offer.pricePerTicket} ${offer.currency}/billet · id=${offer.id} · côte à côte=${String(offer.seatsTogether)}`);
-    await this.step("selectOffer", () => adapter.selectOffer(ctx, offer, config.quantity));
+    await this.step("selectOffer", () => adapter.selectOffer(ctx, offer, config.tickets.quantity));
+    if (adapter.selectSeats) await this.step("selectSeats", () => adapter.selectSeats!(ctx, offer, config.tickets.quantity));
     this.latency.mark("offer-selected");
 
-    if (!config.autoAddToCart) {
+    if (!config.behavior.autoAddToCart) {
       return { status: "ready-not-added", offer, timeline: this.latency.report() };
     }
     await this.step("addToCart", () => adapter.addToCart(ctx));
@@ -189,13 +218,15 @@ export class Agent {
     } catch (err) {
       log.warn(`Ajout effectué mais lecture du panier impossible : ${(err as Error).message}`);
     }
-    const check = cart ? verifyCart(cart, config) : { ok: false, problems: ["panier non relu — à vérifier manuellement"] };
+    const check = cart ? verifyCart(cart, config.tickets) : { ok: false, problems: ["panier non relu — à vérifier manuellement"] };
     return { status: "in-cart", offer, cart, cartOk: check.ok, problems: check.problems, timeline: this.latency.report() };
   }
 
   /**
    * Exécute une étape de l'adaptateur avec la logique de reprise :
-   *  - blocage (file/CAPTCHA/anti-bot) → cession de la main à l'humain, puis nouvel essai ;
+   *  - limite d'achat → arrêt définitif du run (jamais contournée) ;
+   *  - file d'attente / CAPTCHA / anti-bot / connexion → cession de la main à l'humain, puis nouvel essai ;
+   *  - étape confiée à l'humain (choix de places sur un plan) → cession de la main, puis on continue ;
    *  - sélecteur introuvable → réparation par Claude (si activé), puis nouvel essai ;
    *  - sinon l'erreur remonte.
    */
@@ -205,15 +236,18 @@ export class Agent {
       try {
         return await fn();
       } catch (err) {
-        if (err instanceof OfferUnavailableError || err instanceof RateLimitedError || attempt >= 3) throw err;
-        if (err instanceof NotLoggedInError) {
-          await this.handoff({ kind: "unknown", message: err.message });
-          continue;
-        }
-        const blocker =
-          err instanceof BlockerError ? err.blocker : await adapter.detectBlocker(ctx).catch(() => null);
+        if (err instanceof OfferUnavailableError || err instanceof RateLimitedError || err instanceof StopRunError) throw err;
+        if (attempt >= 3) throw err;
+        const blocker: Blocker | null =
+          err instanceof NotLoggedInError
+            ? { kind: "login-required", message: err.message }
+            : err instanceof BlockerError
+              ? err.blocker
+              : await adapter.detectBlocker(ctx).catch(() => null);
         if (blocker) {
+          if (blocker.kind === "purchase-limit") throw new StopRunError(blocker);
           await this.handoff(blocker);
+          if (blocker.kind === "human-step") return undefined as T; // l'humain a réalisé l'étape
           continue;
         }
         if (err instanceof SelectorNotFoundError && (await claude.healSelector(ctx.page, err.spec, ctx.selectors))) {
@@ -227,21 +261,26 @@ export class Agent {
     }
   }
 
-  /** Le bot ne touche plus à la page : l'humain traite la file/le CAPTCHA/la connexion. */
+  /** Le bot ne touche plus à la page : l'humain traite la file/le CAPTCHA/la connexion/le plan de salle. */
   private async handoff(blocker: Blocker): Promise<void> {
     const { config, adapter, ctx, log } = this.d;
-    if (config.browser.headless) {
+    if (!this.d.awaitHuman && config.browser.headless) {
       throw new Error(`Action humaine requise (${blocker.kind}: ${blocker.message}) mais le navigateur est en mode headless.`);
     }
     await ctx.page.bringToFront().catch(() => undefined);
-    await notify({
+    await this.notify({
       title: "🖐️ Action requise",
-      message: `${blocker.message}. Traitez-le dans la fenêtre du navigateur ; le bot reprendra ensuite tout seul (ou appuyez sur Entrée ici).`,
+      message: `${blocker.message}. Traitez-le dans la fenêtre du navigateur ; le bot reprendra ensuite (automatiquement ou avec Entrée ici).`,
       ...config.notifications,
     });
     log.warn(`Passage de main humaine : ${blocker.kind} — ${blocker.message}`);
-    // "unknown" (ex. connexion manuelle) : rien à détecter côté page, seule la confirmation humaine compte.
-    const detectable = blocker.kind !== "unknown";
+    if (this.d.awaitHuman) {
+      await this.d.awaitHuman(blocker);
+      log.info("Reprise du bot.");
+      return;
+    }
+    // Connexion / étape humaine : rien à détecter côté page, seule la confirmation humaine compte.
+    const detectable = AUTO_DETECTABLE.includes(blocker.kind);
     const enter = waitForEnter(
       detectable
         ? "Appuyez sur Entrée quand c'est réglé (ou attendez la détection automatique)."
@@ -271,8 +310,14 @@ export class Agent {
     if (result.status === "sale-timeout") return;
     await ctx.page.bringToFront().catch(() => undefined);
 
-    if (result.status === "ready-not-added") {
-      await notify({
+    if (result.status === "blocked") {
+      await this.notify({
+        title: "⛔ Arrêt du bot",
+        message: `${result.blocker?.message ?? "Blocage"}. Le bot ne contourne pas les limites du site : vérifiez votre compte/panier manuellement.`,
+        ...config.notifications,
+      });
+    } else if (result.status === "ready-not-added") {
+      await this.notify({
         title: "🎟️ Offre sélectionnée (non ajoutée)",
         message: `${result.offer?.category} — ${result.offer?.pricePerTicket} ${result.offer?.currency}/billet. Ajoutez au panier manuellement.`,
         ...config.notifications,
@@ -282,13 +327,13 @@ export class Agent {
       const detail = c ? `${c.itemCount} billet(s), total ${c.totalPrice} ${c.currency}` : "panier à vérifier";
       const expiry = c?.expiresAt ? `\nRéservation jusqu'à ${new Date(c.expiresAt).toLocaleTimeString()}` : "";
       const warn = result.cartOk ? "" : `\n⚠️ À vérifier : ${(result.problems ?? []).join("; ")}`;
-      await notify({
+      await this.notify({
         title: "🎟️ PANIER OBTENU — finalisez le paiement vous-même",
         message: `${result.offer?.category} — ${detail}${expiry}${warn}`,
         ...config.notifications,
       });
     }
     log.info(`Chronologie (T = ouverture officielle) :\n${this.latency.format()}`);
-    log.info(`Rapport : ${this.latency.save("runs", { event: config.event, status: result.status })}`);
+    log.info(`Rapport : ${this.latency.save("runs", { event: config.event.name, status: result.status })}`);
   }
 }

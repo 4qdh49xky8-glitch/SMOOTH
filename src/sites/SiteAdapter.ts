@@ -34,9 +34,63 @@ export interface CartSummary {
   expiresAt?: number;
 }
 
+/**
+ * État « bloquant » remonté au cœur. Le cœur ne contourne JAMAIS aucun de ces états :
+ *  - captcha | queue | anti-bot      : cession de la main à l'humain, reprise auto quand ça disparaît ;
+ *  - login-required | human-step     : cession de la main, reprise quand l'humain confirme (Entrée) ;
+ *  - purchase-limit                  : ARRÊT DÉFINITIF du run (limite d'achat du site, jamais contournée).
+ */
+export type BlockerKind =
+  | "captcha"
+  | "queue"
+  | "anti-bot"
+  | "login-required"
+  | "human-step"
+  | "purchase-limit"
+  | "unknown";
+
 export interface Blocker {
-  kind: "captcha" | "queue" | "anti-bot" | "unknown";
+  kind: BlockerKind;
   message: string;
+}
+
+/** Blocages dont la disparition peut être détectée automatiquement sur la page. */
+export const AUTO_DETECTABLE: readonly BlockerKind[] = ["captcha", "queue", "anti-bot"];
+
+/**
+ * Cadre juridique de l'adaptateur. Le cœur REFUSE de lancer un adaptateur sans déclaration valide
+ * (voir src/sites/compliance.ts). C'est à vous de lire les CGU du site avant de renseigner ceci.
+ */
+export interface Compliance {
+  /**
+   * "official-api"        : le site fournit une API/un partenariat d'intégration officiel ;
+   * "permitted-by-terms"  : les CGU/règles du site autorisent expressément l'outil décrit ;
+   * "demo"                : site local de démonstration uniquement (limité à localhost).
+   */
+  policy: "official-api" | "permitted-by-terms" | "demo";
+  /** Page des CGU / de la documentation qui fonde la décision. */
+  termsUrl: string;
+  /** Date de la dernière relecture, AAAA-MM-JJ (expire après 180 jours). */
+  reviewedAt: string;
+  notes?: string;
+}
+
+export interface AdapterMeta {
+  id: string;
+  displayName: string;
+  compliance: Compliance;
+  capabilities: {
+    /** Utilise une API officielle plutôt que le pilotage de pages. */
+    officialApi: boolean;
+    /** Le site expose une heure serveur précise (sinon repli sur l'en-tête Date, ±500 ms). */
+    preciseServerTime: boolean;
+    /** fetchSale ne nécessite pas de rendu de page. */
+    lightweightAvailability: boolean;
+    /** Le site indique si des places sont côte à côte. */
+    reportsSeatAdjacency: boolean;
+    /** none : pas de choix de places ; automatic : l'adaptateur choisit ; manual : l'humain choisit sur le plan. */
+    seatSelection: "none" | "automatic" | "manual";
+  };
 }
 
 export interface AdapterContext {
@@ -49,39 +103,48 @@ export interface AdapterContext {
 }
 
 /**
- * Contrat à implémenter pour ajouter un site de billetterie.
+ * Contrat à implémenter pour ajouter un site (le plus simple : étendre BaseSiteAdapter).
  * Règles :
- *  - `fetchSale` doit être LÉGER (API JSON ou requête HTTP), sans rendu de page ;
- *  - aucune méthode ne doit contourner CAPTCHA / file d'attente / anti-bot : en cas de blocage,
- *    lever BlockerError (ou retourner un Blocker via detectBlocker) et l'agent passera la main ;
+ *  - `fetchSale` doit être LÉGER (API officielle ou requête HTTP), sans rendu de page ;
+ *  - aucune méthode ne doit contourner CAPTCHA / file d'attente / anti-bot / limite d'achat /
+ *    authentification : en cas de blocage, lever BlockerError (ou retourner un Blocker via
+ *    detectBlocker) et le cœur passe la main ou s'arrête ;
  *  - aucune méthode ne doit déclencher un paiement.
  */
 export interface SiteAdapter {
-  readonly id: string;
+  readonly meta: AdapterMeta;
   /** URLs de paiement : bloquées pendant l'exécution du bot (garde-fou). */
   readonly paymentUrlPatterns: RegExp[];
 
+  /** Ouverture de la page événement : URL à charger. */
   resolveEventUrl(config: BotConfig): string;
 
-  /** Heure serveur en epoch ms, si le site l'expose (sinon l'horloge locale est utilisée). */
+  /** Heure serveur en epoch ms, si le site l'expose. */
   getServerTime?(ctx: AdapterContext): Promise<number>;
 
-  /** Vérifie/établit la session du compte existant. Lève NotLoggedInError si une action humaine est requise. */
+  /** Authentification MANUELLE par défaut : lève NotLoggedInError si l'humain doit se connecter. */
   ensureLoggedIn(ctx: AdapterContext): Promise<void>;
 
-  /** Pré-chauffage avant l'ouverture : charge la page, ouvre les connexions. */
+  /** Pré-chauffage avant l'ouverture : charge la page événement, ouvre les connexions. */
   prepare(ctx: AdapterContext): Promise<void>;
 
-  /** Lit l'état de la vente (léger). Peut lever RateLimitedError. */
+  /** Disponibilité + offres (prix, catégorie, quantité, adjacence). Peut lever RateLimitedError. */
   fetchSale(ctx: AdapterContext): Promise<SaleSnapshot>;
 
   /** Ouvre l'offre et règle la quantité. Peut lever OfferUnavailableError / BlockerError. */
   selectOffer(ctx: AdapterContext, offer: Offer, quantity: number): Promise<void>;
+
+  /**
+   * Optionnel — choix des places après selectOffer. Si le choix doit être fait par l'humain
+   * (plan de salle), lever BlockerError({kind:"human-step"}) : le cœur cède la main puis continue.
+   */
+  selectSeats?(ctx: AdapterContext, offer: Offer, quantity: number): Promise<void>;
 
   /** Clique « Ajouter au panier » et attend la confirmation (ou OfferUnavailableError). */
   addToCart(ctx: AdapterContext): Promise<void>;
 
   readCart(ctx: AdapterContext): Promise<CartSummary>;
 
+  /** Lecture seule de la page : file d'attente, CAPTCHA, anti-bot, limite d'achat, session expirée. */
   detectBlocker(ctx: AdapterContext): Promise<Blocker | null>;
 }

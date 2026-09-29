@@ -1,9 +1,9 @@
 import type { BotConfig } from "../config/schema.js";
-import { detectCommonBlocker } from "../selectors/blockers.js";
 import { exampleSelectors as S } from "../selectors/example.js";
 import { seatsAreContiguous } from "../agent/matcher.js";
 import { NotLoggedInError, OfferUnavailableError, RateLimitedError } from "../utils/errors.js";
-import type { AdapterContext, Blocker, CartSummary, Offer, SaleSnapshot, SiteAdapter } from "./SiteAdapter.js";
+import { BaseSiteAdapter } from "./BaseSiteAdapter.js";
+import type { AdapterContext, AdapterMeta, CartSummary, Offer, SaleSnapshot } from "./SiteAdapter.js";
 
 interface ApiOffer {
   id: string;
@@ -26,12 +26,28 @@ interface ApiOffer {
  *  - selectOffer() navigue directement vers l'URL de l'offre (deep link), sans passer par la liste ;
  *  - aucune attente fixe : uniquement des waitFor sur des éléments/événements.
  */
-export class ExampleSite implements SiteAdapter {
-  readonly id = "example";
-  readonly paymentUrlPatterns = [/\/payment(\/|\?|$)/];
+export default class ExampleSite extends BaseSiteAdapter {
+  readonly meta: AdapterMeta = {
+    id: "example",
+    displayName: "Site de démonstration local",
+    compliance: {
+      policy: "demo",
+      termsUrl: "http://127.0.0.1/demo",
+      reviewedAt: "2026-09-29",
+      notes: "Serveur factice de demo/server.ts. Limité à localhost par le contrôle de conformité.",
+    },
+    capabilities: {
+      officialApi: false,
+      preciseServerTime: true,
+      lightweightAvailability: true,
+      reportsSeatAdjacency: true,
+      seatSelection: "none",
+    },
+  };
+  override readonly paymentUrlPatterns = [/\/payment(\/|\?|$)/];
 
-  resolveEventUrl(config: BotConfig): string {
-    return config.eventUrl ?? "http://127.0.0.1:4173/event";
+  override resolveEventUrl(config: BotConfig): string {
+    return config.event.url ?? "http://127.0.0.1:4173/event";
   }
 
   private origin(ctx: AdapterContext): string {
@@ -43,7 +59,13 @@ export class ExampleSite implements SiteAdapter {
     return ((await res.json()) as { now: number }).now;
   }
 
-  async ensureLoggedIn(ctx: AdapterContext): Promise<void> {
+  protected async isLoggedIn(ctx: AdapterContext): Promise<boolean> {
+    await ctx.page.goto(`${this.origin(ctx)}/account`, { waitUntil: "domcontentloaded" });
+    return !ctx.page.url().includes("/login");
+  }
+
+  /** Identifiants optionnels (env) ; sinon connexion manuelle (comportement par défaut de la base). */
+  override async ensureLoggedIn(ctx: AdapterContext): Promise<void> {
     const { page, selectors, env } = ctx;
     await page.goto(`${this.origin(ctx)}/account`, { waitUntil: "domcontentloaded" });
     if (page.url().includes("/login")) {
@@ -58,7 +80,7 @@ export class ExampleSite implements SiteAdapter {
     await selectors.wait(page, S.accountName);
   }
 
-  async prepare(ctx: AdapterContext): Promise<void> {
+  override async prepare(ctx: AdapterContext): Promise<void> {
     await ctx.page.goto(this.resolveEventUrl(ctx.config), { waitUntil: "domcontentloaded" });
     // Ouvre la connexion HTTP/TLS de l'API : la première requête réelle n'a pas de handshake à payer.
     await ctx.context.request.get(`${this.origin(ctx)}/api/offers`).catch(() => undefined);
@@ -71,7 +93,7 @@ export class ExampleSite implements SiteAdapter {
     }
     if (!res.ok()) throw new Error(`API offres : HTTP ${res.status()}`);
     const body = (await res.json()) as { open: boolean; offers: ApiOffer[] };
-    const qty = ctx.config.quantity;
+    const qty = ctx.config.tickets.quantity;
     const offers: Offer[] = body.offers.map((o) => ({
       id: o.id,
       category: o.category,
@@ -129,9 +151,5 @@ export class ExampleSite implements SiteAdapter {
       items: data.items,
       expiresAt: data.expiresAt || undefined,
     };
-  }
-
-  detectBlocker(ctx: AdapterContext): Promise<Blocker | null> {
-    return detectCommonBlocker(ctx.page);
   }
 }

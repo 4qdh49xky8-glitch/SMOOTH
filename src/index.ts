@@ -8,7 +8,8 @@ import { traceSlowRequests, tuneNetwork } from "./browser/cdp.js";
 import { openBrowser } from "./browser/launch.js";
 import { loadConfig } from "./config/load.js";
 import { SelectorResolver } from "./selectors/resolver.js";
-import { getAdapter } from "./sites/registry.js";
+import { assertCompliant } from "./sites/compliance.js";
+import { discoverAdapters, getAdapter } from "./sites/registry.js";
 import type { AdapterContext } from "./sites/SiteAdapter.js";
 import { Clock } from "./utils/clock.js";
 import { createLogger } from "./utils/logger.js";
@@ -17,7 +18,8 @@ import { waitForEnter } from "./utils/prompt.js";
 const USAGE = `Usage : tsx src/index.ts <commande> [--config config/event.json] [--trace] [--exit-when-done]
   run     Lance l'agent (attend l'ouverture, met au panier, s'arrête)
   login   Ouvre le navigateur sur le site pour vous connecter à la main (profil conservé)
-  check   Valide la config et mesure le décalage d'horloge avec le site`;
+  check   Valide la config, la conformité de l'adaptateur et mesure le décalage d'horloge
+  (option) --list-sites   Liste les adaptateurs découverts dans src/sites/`;
 
 export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
   const { positionals, values } = parseArgs({
@@ -27,9 +29,17 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
       config: { type: "string", default: "config/event.json" },
       trace: { type: "boolean", default: false },
       "exit-when-done": { type: "boolean", default: false },
+      "list-sites": { type: "boolean", default: false },
     },
   });
   const command = positionals[0];
+  if (values["list-sites"]) {
+    for (const a of await discoverAdapters()) {
+      const c = a.meta.compliance;
+      console.log(`${a.meta.id.padEnd(14)} ${a.meta.displayName} — ${c.policy}, CGU relues le ${c.reviewedAt}`);
+    }
+    return;
+  }
   if (!command || !["run", "login", "check"].includes(command)) {
     console.log(USAGE);
     process.exit(command ? 1 : 0);
@@ -37,7 +47,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
 
   const log = createLogger();
   const config = loadConfig(values.config!);
-  const adapter = getAdapter(config.site);
+  const adapter = await getAdapter(config.site);
+  assertCompliant(adapter.meta, adapter.resolveEventUrl(config)); // refus AVANT d'ouvrir le navigateur
   const session = await openBrowser(config, log);
   const ctx: AdapterContext = {
     config,
@@ -45,7 +56,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     page: session.page,
     log,
     env: process.env,
-    selectors: new SelectorResolver(adapter.id),
+    selectors: new SelectorResolver(adapter.meta.id),
   };
 
   if (command === "login") {
@@ -58,7 +69,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
 
   if (command === "check") {
     const { estimateOffset } = await import("./utils/clock.js");
-    log.info(`Configuration valide. Ouverture : ${config.saleTime} (dans ${((Date.parse(config.saleTime) - Date.now()) / 60000).toFixed(1)} min)`);
+    log.info(`Configuration valide. Ouverture : ${config.sale.startTime} (dans ${((Date.parse(config.sale.startTime) - Date.now()) / 60000).toFixed(1)} min)`);
+    log.info(`Adaptateur « ${adapter.meta.displayName} » — capacités : ${JSON.stringify(adapter.meta.capabilities)}`);
     if (adapter.getServerTime) {
       const est = await estimateOffset(() => adapter.getServerTime!(ctx));
       log.info(`Décalage d'horloge serveur : ${est.offsetMs.toFixed(1)} ms, RTT min ${est.rttMs.toFixed(1)} ms`);

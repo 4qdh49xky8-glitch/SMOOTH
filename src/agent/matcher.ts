@@ -1,4 +1,4 @@
-import type { BotConfig } from "../config/schema.js";
+import type { TicketCriteria } from "../config/schema.js";
 import type { CartSummary, Offer } from "../sites/SiteAdapter.js";
 
 export const normalize = (s: string): string =>
@@ -9,10 +9,7 @@ export const normalize = (s: string): string =>
     .replace(/\s+/g, " ")
     .trim();
 
-type Criteria = Pick<
-  BotConfig,
-  "quantity" | "maxPricePerTicket" | "categories" | "seatsTogether" | "seatsTogetherStrict"
->;
+type Criteria = TicketCriteria;
 
 /**
  * Filtre puis classe les offres. 100 % déterministe (aucun appel LLM).
@@ -25,14 +22,14 @@ export function rankOffers(offers: Offer[], c: Criteria): Offer[] {
   return offers
     .filter((o) => o.available >= c.quantity)
     .filter((o) => o.pricePerTicket <= c.maxPricePerTicket)
-    .filter((o) => wanted.includes(normalize(o.category)))
+    .filter((o) => wanted.length === 0 || wanted.includes(normalize(o.category)))
     .filter((o) => !(c.seatsTogether && c.seatsTogetherStrict) || o.seatsTogether === true)
     .sort((a, b) => {
       if (c.seatsTogether) {
         const d = togetherRank(a) - togetherRank(b);
         if (d) return d;
       }
-      const cat = wanted.indexOf(normalize(a.category)) - wanted.indexOf(normalize(b.category));
+      const cat = wanted.length ? wanted.indexOf(normalize(a.category)) - wanted.indexOf(normalize(b.category)) : 0;
       return cat || a.pricePerTicket - b.pricePerTicket;
     });
 }

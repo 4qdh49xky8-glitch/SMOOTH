@@ -38,3 +38,11 @@ export class SelectorNotFoundError extends Error {
     this.name = "SelectorNotFoundError";
   }
 }
+
+/** Arrêt définitif du run (ex. limite d'achat atteinte) : jamais contourné, jamais réessayé. */
+export class StopRunError extends Error {
+  constructor(public readonly blocker: Blocker) {
+    super(`Arrêt : ${blocker.message}`);
+    this.name = "StopRunError";
+  }
+}

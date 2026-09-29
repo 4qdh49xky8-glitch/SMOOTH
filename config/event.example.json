@@ -1,19 +1,25 @@
 {
-  "event": "MON EVENEMENT",
   "site": "example",
-  "eventUrl": "http://127.0.0.1:4173/event",
-  "saleTime": "2026-10-01T10:00:00+02:00",
-  "quantity": 2,
-  "maxPricePerTicket": 150,
-  "categories": ["Catégorie 1", "Catégorie 2", "Catégorie 3"],
-  "seatsTogether": true,
-  "autoAddToCart": true,
-  "autoPayment": false,
-  "timing": {
-    "preArmSeconds": 90,
-    "pollIntervalMs": 400,
-    "maxWaitAfterSaleSeconds": 900
+  "event": {
+    "name": "Nom de l'événement",
+    "date": "2026-12-01",
+    "url": "http://127.0.0.1:4173/event"
   },
+  "sale": {
+    "startTime": "2026-10-01T10:00:00+02:00"
+  },
+  "tickets": {
+    "quantity": 2,
+    "maxPricePerTicket": 150,
+    "categories": [],
+    "seatsTogether": true
+  },
+  "behavior": {
+    "autoAddToCart": true,
+    "autoPayment": false
+  },
+  "siteOptions": {},
+  "timing": { "preArmSeconds": 90, "pollIntervalMs": 400, "maxWaitAfterSaleSeconds": 900 },
   "browser": { "headless": false, "userDataDir": ".profile", "debugPort": 9222, "blockHeavyResources": true },
   "claude": { "enabled": false, "model": "claude-haiku-4-5-20251001", "maxCallsPerRun": 6 },
   "notifications": { "desktop": true, "sound": true }
