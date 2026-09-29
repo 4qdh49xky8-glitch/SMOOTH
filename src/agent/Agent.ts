@@ -240,17 +240,25 @@ export class Agent {
       ...config.notifications,
     });
     log.warn(`Passage de main humaine : ${blocker.kind} — ${blocker.message}`);
-    const enter = waitForEnter("Appuyez sur Entrée quand c'est réglé (ou attendez la détection automatique).");
+    // "unknown" (ex. connexion manuelle) : rien à détecter côté page, seule la confirmation humaine compte.
+    const detectable = blocker.kind !== "unknown";
+    const enter = waitForEnter(
+      detectable
+        ? "Appuyez sur Entrée quand c'est réglé (ou attendez la détection automatique)."
+        : "Appuyez sur Entrée quand c'est fait.",
+    );
     let cleared = false;
-    const auto = (async () => {
-      let clean = 0;
-      while (!cleared) {
-        await sleep(500);
-        const b = blocker.kind === "unknown" ? null : await adapter.detectBlocker(ctx).catch(() => blocker);
-        clean = b ? 0 : clean + 1;
-        if (clean >= 2) return;
-      }
-    })();
+    const auto = detectable
+      ? (async () => {
+          let clean = 0;
+          while (!cleared) {
+            await sleep(500);
+            const b = await adapter.detectBlocker(ctx).catch(() => blocker);
+            clean = b ? 0 : clean + 1;
+            if (clean >= 2) return;
+          }
+        })()
+      : new Promise<void>(() => undefined);
     await Promise.race([enter.promise, auto]);
     cleared = true;
     enter.cancel();
