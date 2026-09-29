@@ -1,0 +1,34 @@
+{
+  "name": "16",
+  "description": "Aucun billet disponible : SOLD_OUT, cadence de surveillance ralentie, aucune sélection.",
+  "config": {
+    "tickets": {
+      "quantity": 2,
+      "maxPricePerTicket": 150,
+      "categories": [],
+      "seatsTogether": true,
+      "seatsTogetherStrict": false
+    },
+    "timing": {
+      "pollIntervalMs": 200,
+      "soldOutPollIntervalMs": 800
+    }
+  },
+  "soldOut": true,
+  "maxWaitMs": 3000,
+  "offers": [],
+  "expect": {
+    "status": "sale-timeout",
+    "finalState": "SOLD_OUT",
+    "failureReason": "NO_MATCHING_OFFER",
+    "attempts": 0
+  },
+  "saleOpensAfterMs": 300,
+  "latencyMs": {
+    "fetchSale": 5,
+    "selectOffer": 20,
+    "addToCart": 30,
+    "readCart": 5
+  },
+  "humanResolveMs": 150
+}

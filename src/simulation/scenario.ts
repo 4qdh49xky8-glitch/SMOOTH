@@ -33,6 +33,22 @@ export const ScenarioSchema = z.object({
   maxWaitMs: z.number().min(200).default(6000),
   /** Le faux site affiche « complet » (SOLD_OUT). */
   soldOut: z.boolean().default(false),
+  /** Surcharge partielle de la configuration (fusion profonde) : rend le scénario autonome, indépendant du profil. */
+  config: z.record(z.unknown()).optional(),
+  /** Limite d'achat du faux site (billets par commande). */
+  purchaseLimit: z.number().int().min(1).optional(),
+  /** true (défaut) : l'adaptateur déclare la limite (meta) ; false : elle n'est révélée qu'au moment de la sélection. */
+  declareLimit: z.boolean().default(true),
+  /** Fenêtres pendant lesquelles le faux site est en file d'attente / CAPTCHA / contrôle anti-bot (ms après sale.startTime). */
+  blockWindows: z
+    .array(z.object({ state: z.enum(["QUEUE", "CAPTCHA", "BLOCKED"]), fromMs: z.number().min(0), untilMs: z.number().min(1) }))
+    .default([]),
+  /** Ce que le faux site met réellement au panier (simule un ajout partiel). */
+  cart: z.object({ itemCount: z.number().int().min(0).optional(), unitPrice: z.number().optional() }).optional(),
+  /** false : personne pour traiter les blocages (navigateur headless) — le bot doit s'arrêter proprement. */
+  humanAvailable: z.boolean().default(true),
+  /** Les messages d'erreur du faux site contiennent des secrets factices (URL à jeton, e-mail, carte) : vérifie l'assainissement. */
+  leakCanaries: z.boolean().default(false),
   offers: z
     .array(
       z.object({
@@ -72,6 +88,17 @@ export type Scenario = z.infer<typeof ScenarioSchema>;
 
 export const SCENARIOS_DIR = "simulations";
 
+/** Secrets factices injectés dans les messages du faux site quand `leakCanaries` est actif. */
+export const CANARIES = {
+  token: "CANARY_TOKEN_9f8e7d6c5b4a",
+  session: "CANARY_SID_a1b2c3d4e5f6",
+  email: "canary.user@example.com",
+  card: "4970101234567890",
+} as const;
+
+export const canarySuffix = (): string =>
+  ` [https://shop.example/queue?token=${CANARIES.token}&sid=${CANARIES.session} — compte ${CANARIES.email} — carte ${CANARIES.card} — password=hunter2secret]`;
+
 export function loadScenario(target: string, dir = SCENARIOS_DIR): Scenario {
   const path = existsSync(target) ? target : join(dir, target.endsWith(".json") ? target : `${target}.json`);
   let raw: unknown;
@@ -87,9 +114,15 @@ export function loadScenario(target: string, dir = SCENARIOS_DIR): Scenario {
   return parsed.data;
 }
 
-export function listScenarios(dir = SCENARIOS_DIR): string[] {
+/** Scénarios d'un dossier ; `recursive` ajoute les sous-dossiers (ex. « stress/01-… »). */
+export function listScenarios(dir = SCENARIOS_DIR, recursive = false): string[] {
   try {
-    return readdirSync(dir).filter((f) => f.endsWith(".json")).map((f) => basename(f, ".json")).sort();
+    const out: string[] = [];
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.isFile() && e.name.endsWith(".json")) out.push(basename(e.name, ".json"));
+      else if (recursive && e.isDirectory()) out.push(...listScenarios(join(dir, e.name), true).map((n) => `${e.name}/${n}`));
+    }
+    return out.sort();
   } catch {
     return [];
   }

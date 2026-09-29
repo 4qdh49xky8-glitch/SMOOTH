@@ -18,6 +18,14 @@ export async function validateCommand(target: string | undefined, opts: { all: b
   }
   const reports: ValidationReport[] = [];
   for (const t of targets) reports.push(await validateConfig(t));
+  // Deux profils qui partagent un même profil Chromium ne peuvent pas tourner en même temps (un navigateur = un profil).
+  const byDir = new Map<string, string[]>();
+  for (const r of reports) {
+    const dir = r.config?.browser.userDataDir;
+    if (dir) byDir.set(dir, [...(byDir.get(dir) ?? []), r.profile]);
+  }
+  for (const [dir, names] of byDir)
+    if (names.length > 1) for (const r of reports) if (names.includes(r.profile)) r.warnings.push(`browser.userDataDir « ${dir} » partagé avec ${names.filter((n) => n !== r.profile).join(", ")} : ces profils ne pourront pas tourner simultanément (laissez userDataDir vide : un navigateur par profil).`);
   if (opts.json) console.log(JSON.stringify(reports.map(({ config: _c, ...r }) => r), null, 2));
   else {
     reports.forEach(print);

@@ -9,7 +9,7 @@ déclencher un paiement.
 npm run simulate                                   # scénario « nominal » avec le profil « concert »
 npm run simulate -- --scenario queue               # un scénario précis
 npm run simulate -- --profile spectacle --scenario contention
-npm run simulate -- --all                          # tous les scénarios + vérification des résultats attendus
+npm run simulate -- --all                          # tous les scénarios (12 de base + 21 de stress) avec vérification des résultats attendus
 npm run simulate -- --scenario queue --log-level debug
 ```
 
@@ -58,6 +58,12 @@ Un fichier JSON dans `simulations/` (validé au chargement) :
   "humanResolveMs": 150,              // temps que met « l'humain » à traiter un blocage
   "maxWaitMs": 3000,                  // durée de surveillance
   "soldOut": false,                   // le faux site affiche « complet »
+  "config": { "tickets": { "quantity": 4, "maxPricePerTicket": 120 } },   // surcharge de la configuration : scénario autonome, vérifiable avec n'importe quel profil
+  "purchaseLimit": 2, "declareLimit": true,   // limite d'achat du faux site ; connue d'avance (true) ou révélée à la sélection (false)
+  "blockWindows": [{ "state": "QUEUE", "fromMs": 0, "untilMs": 1300 }],   // file / CAPTCHA / anti-bot affichés (ms après l'ouverture)
+  "cart": { "itemCount": 2 },         // ce que le faux site met réellement au panier (ajout partiel)
+  "humanAvailable": true,             // false : personne pour traiter les blocages (headless)
+  "leakCanaries": false,              // true : les messages d'erreur du faux site contiennent des secrets factices (test d'assainissement)
   "offers": [
     { "id": "o1", "category": "Catégorie 2", "price": 139, "available": 2,
       "section": "B", "row": "7", "seats": ["5", "6"],
@@ -76,6 +82,9 @@ Un fichier JSON dans `simulations/` (validé au chargement) :
   `MANUAL_SELECTION`, `PURCHASE_LIMIT`, `ERROR`.
 - `expect` (optionnel) : `finalState` (requis dans `expect`), `status`, `failureReason`, `attempts`,
   `humanHandoffs`, `offerId`, `statesInclude` ; vérifié par `--all` et par la suite de tests.
+
+Les scénarios de `simulations/stress/` portent leur propre `config` et leurs propres attentes : ils se vérifient avec
+n'importe quel profil. Voir [STRESS_TESTS.md](STRESS_TESTS.md).
 
 Ajoutez un scénario chaque fois qu'un cas réel vous surprend : il devient un test de non-régression du cœur.
 

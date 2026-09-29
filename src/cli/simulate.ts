@@ -1,6 +1,6 @@
 import { loadConfig } from "../config/load.js";
 import { runSimulation } from "../simulation/run.js";
-import { listScenarios, loadScenario } from "../simulation/scenario.js";
+import { listScenarios, loadScenario, SCENARIOS_DIR } from "../simulation/scenario.js";
 import type { Logger } from "../utils/logger.js";
 import { createLogger } from "../utils/logger.js";
 
@@ -21,14 +21,16 @@ export async function simulateCommand(o: SimulateOptions): Promise<number> {
   const config = loadConfig(o.target ?? "concert");
   // Les résultats attendus des scénarios livrés sont écrits pour le profil de référence « concert ».
   const enforce = (o.target ?? "concert") === "concert";
-  const names = o.all ? listScenarios() : [o.scenario ?? "nominal"];
+  const names = o.all ? listScenarios(SCENARIOS_DIR, true) : [o.scenario ?? "nominal"];
   let failures = 0;
   for (const name of names) {
     const scenario = loadScenario(name);
     // En mode --all, chaque scénario est rejoué en silence : une ligne de bilan par scénario.
     const log = o.all ? createLogger({ level: "silent" }) : o.log;
     const { result, mismatches: all, handoffs } = await runSimulation({ config, scenario, log, startInMs: o.startInMs, telemetryDir: o.telemetryDir, profile: o.target });
-    const mismatches = enforce ? all : [];
+    // Un scénario qui porte sa propre configuration (`config`) est vérifiable avec n'importe quel profil.
+    const checked = enforce || scenario.config !== undefined;
+    const mismatches = checked ? all : [];
     const m = result.telemetry.metrics;
     const ok = mismatches.length === 0;
     if (!ok) failures++;
@@ -38,7 +40,7 @@ export async function simulateCommand(o: SimulateOptions): Promise<number> {
     );
     for (const x of mismatches) console.log(`    ✗ ${x}`);
   }
-  if (!enforce) console.log(`(profil « ${o.target} » : les résultats attendus des scénarios livrés sont écrits pour le profil « concert » et n'ont pas été vérifiés)`);
+  if (!enforce && names.some((n) => loadScenario(n).config === undefined)) console.log(`(profil « ${o.target} » : les résultats attendus des scénarios livrés sont écrits pour le profil « concert » et n'ont pas été vérifiés)`);
   if (o.all) console.log(`\n${names.length - failures}/${names.length} scénario(s) conformes.`);
   return failures ? 1 : 0;
 }

@@ -1,0 +1,114 @@
+{
+  "name": "11",
+  "description": "Huit offres apparaissent en même temps : un seul choix, cohérent, indépendant de l'ordre de la liste.",
+  "config": {
+    "tickets": {
+      "quantity": 2,
+      "maxPricePerTicket": 150,
+      "categories": [
+        "A",
+        "B",
+        "C"
+      ],
+      "seatsTogether": true,
+      "seatsTogetherStrict": false
+    }
+  },
+  "offers": [
+    {
+      "id": "o0",
+      "category": "C",
+      "price": 60,
+      "available": 2,
+      "seats": [
+        "1",
+        "2"
+      ]
+    },
+    {
+      "id": "o1",
+      "category": "B",
+      "price": 70,
+      "available": 2,
+      "seats": [
+        "3",
+        "4"
+      ]
+    },
+    {
+      "id": "o2",
+      "category": "A",
+      "price": 95,
+      "available": 2,
+      "seats": [
+        "9",
+        "20"
+      ]
+    },
+    {
+      "id": "o3",
+      "category": "A",
+      "price": 100,
+      "available": 2,
+      "seats": [
+        "5",
+        "6"
+      ]
+    },
+    {
+      "id": "o4",
+      "category": "B",
+      "price": 50,
+      "available": 2,
+      "seats": [
+        "7",
+        "8"
+      ]
+    },
+    {
+      "id": "o5",
+      "category": "A",
+      "price": 90,
+      "available": 2,
+      "seats": [
+        "11",
+        "12"
+      ]
+    },
+    {
+      "id": "o6",
+      "category": "C",
+      "price": 40,
+      "available": 2,
+      "seats": [
+        "13",
+        "14"
+      ]
+    },
+    {
+      "id": "o7",
+      "category": "A",
+      "price": 90,
+      "available": 2,
+      "seats": [
+        "31",
+        "32"
+      ]
+    }
+  ],
+  "expect": {
+    "status": "in-cart",
+    "finalState": "CART_SUCCESS",
+    "offerId": "o5",
+    "attempts": 1
+  },
+  "saleOpensAfterMs": 300,
+  "latencyMs": {
+    "fetchSale": 5,
+    "selectOffer": 20,
+    "addToCart": 30,
+    "readCart": 5
+  },
+  "humanResolveMs": 150,
+  "maxWaitMs": 2500
+}

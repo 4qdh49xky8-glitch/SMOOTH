@@ -1,0 +1,50 @@
+{
+  "name": "06a",
+  "description": "Quantité 4 mais seules des offres de 2 places : aucune sélection, aucun panier incomplet.",
+  "config": {
+    "tickets": {
+      "quantity": 4,
+      "maxPricePerTicket": 200,
+      "categories": [],
+      "seatsTogether": true,
+      "seatsTogetherStrict": false
+    }
+  },
+  "maxWaitMs": 1200,
+  "offers": [
+    {
+      "id": "deux-a",
+      "category": "A",
+      "price": 80,
+      "available": 2,
+      "seats": [
+        "1",
+        "2"
+      ]
+    },
+    {
+      "id": "deux-b",
+      "category": "A",
+      "price": 90,
+      "available": 2,
+      "seats": [
+        "5",
+        "6"
+      ]
+    }
+  ],
+  "expect": {
+    "status": "sale-timeout",
+    "finalState": "AVAILABLE",
+    "failureReason": "NO_MATCHING_OFFER",
+    "attempts": 0
+  },
+  "saleOpensAfterMs": 300,
+  "latencyMs": {
+    "fetchSale": 5,
+    "selectOffer": 20,
+    "addToCart": 30,
+    "readCart": 5
+  },
+  "humanResolveMs": 150
+}

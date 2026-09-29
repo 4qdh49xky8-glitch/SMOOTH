@@ -6,3 +6,4 @@ dist
 runs
 *.log
 config/event.json
+.locks

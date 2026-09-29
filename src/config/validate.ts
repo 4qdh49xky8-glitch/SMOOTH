@@ -70,6 +70,8 @@ export async function validateConfig(target: string, opts: ValidateOptions = {})
     }
     for (const m of adapter.validateOptions?.(cfg.siteOptions) ?? []) errors.push(`siteOptions : ${m}`);
 
+    if (caps.maxTicketsPerOrder !== undefined && cfg.tickets.quantity > caps.maxTicketsPerOrder)
+      errors.push(`tickets.quantity (${cfg.tickets.quantity}) dépasse la limite d'achat du site (${caps.maxTicketsPerOrder}) : le bot ne contourne jamais les limites, il refusera de démarrer.`);
     if (cfg.tickets.seatsTogether && cfg.tickets.seatsTogetherStrict && !caps.reportsSeatAdjacency)
       warnings.push("seatsTogetherStrict=true mais ce site n'indique pas si les places sont côte à côte : aucune offre ne sera jamais retenue.");
     if (caps.seatSelection === "manual" && cfg.browser.headless) errors.push("ce site exige un choix de places manuel : browser.headless doit être false.");

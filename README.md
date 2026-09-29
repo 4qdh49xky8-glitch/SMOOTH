@@ -33,7 +33,8 @@ et laisse le navigateur ouvert pour que vous vérifiiez et payiez vous-même.
 | `npm run check` | valide la config, la conformité et mesure l'horloge du site |
 | `npm start` | attend l'ouverture, met au panier, notifie, s'arrête avant le paiement (`-- --profile concert`) |
 | `npm run stats` | agrégats de la télémétrie locale (médiane, p95, taux de réussite, raisons d'échec) |
-| `npm test` | toute la suite de tests (hors ligne) |
+| `npm test` | toute la suite de tests, dont le stress test (hors ligne ; un vrai Chromium local pour les contrôles navigateur) |
+| `npm run test:stress` | le stress test seul : 18 scénarios de décision, Claude, concurrence, performance, navigateur réel |
 | `npm run demo` | E2E : site factice local + vrai Chromium |
 
 Options communes : `--config <fichier>` ou `--profile <nom>`, `--log-level error|warn|info|debug`, `--log-file`,
@@ -79,6 +80,7 @@ registre, de la config ni des commandes.
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | profils et héritage, référence des champs, stratégie de sélection, recettes par type d'événement |
 | [docs/STATES_AND_TELEMETRY.md](docs/STATES_AND_TELEMETRY.md) | les 10 états, raisons d'échec, télémétrie locale et vie privée, niveaux de logs |
 | [docs/SIMULATION.md](docs/SIMULATION.md) | mode simulation, scénarios fournis, écrire un scénario |
+| [docs/STRESS_TESTS.md](docs/STRESS_TESTS.md) | les 18 scénarios de stress, défauts trouvés et corrigés, audit concurrence/boucles/attentes, isolation des instances |
 
 ## Démarrage rapide
 
@@ -90,7 +92,7 @@ cp config/event.example.json config/event.json
 
 npm run sites                       # adaptateurs disponibles
 npm run validate -- --all           # profils valides ?
-npm run simulate -- --all           # 12 scénarios contre le vrai cœur, sans réseau
+npm run simulate -- --all           # 33 scénarios (dont 21 de stress) contre le vrai cœur, sans réseau
 npm test                            # suite complète
 npm run demo                        # bout en bout avec Chromium et le site factice
 ```

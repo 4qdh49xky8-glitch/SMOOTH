@@ -50,11 +50,14 @@ Sans option, `npm start` lit `config/event.json`. Un ancien fichier plat (V1 : `
 | `timing.preArmSeconds` | 90 | préparation (connexion, chargement) avant l'ouverture |
 | `timing.pollIntervalMs` | 400 (min 200) | intervalle minimal entre deux interrogations (limitation volontaire) |
 | `timing.pollJitterMs` | 50 | gigue ajoutée à l'intervalle |
+| `timing.soldOutPollIntervalMs` | 1000 (min 200) | intervalle quand la vente est ouverte mais **complète** (`SOLD_OUT`) : pas de surveillance agressive inutile |
 | `timing.maxWaitAfterSaleSeconds` | 900 | durée de surveillance après l'ouverture |
 | `timing.actionTimeoutMs` | 4000 | délai max d'une action navigateur |
 | `cart.maxAttempts` | 5 | nombre max d'offres tentées |
+| `cart.unavailableCooldownMs` | 3000 | une offre signalée vendue n'est pas retentée avant ce délai (liste périmée) |
 | `browser.headless` | `false` | `true` interdit la cession de la main (avertissement/erreur selon le site) |
-| `browser.userDataDir`, `debugPort` | `.profile`, 9222 | profil Chromium persistant (votre session) et port CDP |
+| `browser.userDataDir` | `.profile/<profil>` | profil Chromium persistant (votre session) : **un navigateur par profil**, jamais partagé |
+| `browser.debugPort` | `0` | port CDP ; `0` = automatique (retrouvé dans le profil). Un port fixe déjà pris par un autre profil est refusé |
 | `browser.blockHeavyResources` | `true` | images/polices/analytics bloqués pendant la course, rétablis ensuite |
 | `claude.enabled` | `false` | assistant de réparation de sélecteurs (secours) ; nécessite `ANTHROPIC_API_KEY` |
 | `notifications.desktop/sound` | `true` | notification système / bip |
@@ -107,6 +110,13 @@ Départage final : prix croissant, puis `id` (résultat stable). Les clés de ch
 | **Théâtre / spectacle** | jamais séparés, meilleur siège dans le budget | `seatsTogetherStrict: true`, `priceOrder: most-expensive`, `preferSections: [Orchestre centre]` |
 | **Culturel (musée, visite)** | créneau et quantité | `categories: []`, `priority: [price]` ; l'adaptateur expose créneau/horaire comme catégorie |
 
+## Plusieurs instances
+
+Deux profils sur des **événements différents** peuvent tourner en même temps : navigateur, profil, cookies, logs
+(`[profil#PID:…]`) et télémétrie sont séparés (connectez-vous une fois par profil : `npm run login -- --profile <nom>`).
+Deux instances sur le **même événement** sont refusées par un verrou (`.locks/`) : ce serait multiplier les sessions et
+les paniers. `logging.file` accepte `{profile}` et `{pid}` pour un fichier de log par instance.
+
 ## Ce que `validate` contrôle
 
 `npm run validate` ne contacte aucun site. Il vérifie : le schéma ; l'existence de l'adaptateur ; sa
@@ -114,5 +124,6 @@ conformité (autorisation valide et récente, démo limitée à `localhost`) et 
 `sale.startTime` dans le passé ; `event.date` passée ou antérieure à l'ouverture ; catégories en double ;
 `priorityCategories` absentes de `tickets.categories` ; sections à la fois préférées et évitées ;
 `seatsTogetherStrict` sur un site qui ne renseigne pas l'adjacence (**aucune offre ne serait retenue**) ;
-`headless` avec choix de places manuel (erreur) ou avec un vrai site (avertissement) ; cadence < 400 ms sur un
+quantité supérieure à la limite d'achat déclarée par l'adaptateur (`maxTicketsPerOrder`, erreur : le bot refuserait de
+démarrer) ; profils qui partagent un même `userDataDir` (avertissement avec `--all`) ; `headless` avec choix de places manuel (erreur) ou avec un vrai site (avertissement) ; cadence < 400 ms sur un
 vrai site ; `claude.enabled` sans clé d'API. Code de sortie 1 s'il y a au moins une erreur.

@@ -10,6 +10,22 @@ export class FakeAdapter extends BaseSiteAdapter {
     capabilities: { officialApi: false, preciseServerTime: true, lightweightAvailability: true, reportsSeatAdjacency: true, seatSelection: "none" },
   };
   calls: string[] = [];
+  /** Latences simulées (ms) et chronologie détaillée de chaque appel (début/fin), pour mesurer parallélisme et attentes. */
+  latency: Partial<Record<"fetchSale" | "detectBlocker" | "selectOffer" | "addToCart" | "readCart", number>> = {};
+  timeline: { name: string; start: number; end: number }[] = [];
+  private async timed<T>(name: keyof FakeAdapter["latency"] & string, fn: () => T | Promise<T>): Promise<T> {
+    const start = performance.now();
+    const ms = this.latency[name];
+    if (ms) await new Promise((r) => setTimeout(r, ms));
+    try {
+      return await fn();
+    } finally {
+      this.timeline.push({ name, start, end: performance.now() });
+    }
+  }
+  count(name: string): number {
+    return this.timeline.filter((t) => t.name === name).length;
+  }
   offers: Offer[] = [];
   /** Erreurs à lever, dans l'ordre, par étape (consommées une fois). */
   failures: Record<string, (Error | undefined)[]> = {};
@@ -31,23 +47,32 @@ export class FakeAdapter extends BaseSiteAdapter {
     this.calls.push("prepare");
   }
   async fetchSale(): Promise<SaleSnapshot> {
-    this.calls.push("fetchSale");
-    return { open: true, offers: this.offers };
+    return this.timed("fetchSale", () => {
+      this.calls.push("fetchSale");
+      return { open: this.saleOpen, offers: this.offers };
+    });
   }
+  saleOpen = true;
   async selectOffer(_c: AdapterContext, offer: Offer): Promise<void> {
-    this.calls.push(`selectOffer:${offer.id}`);
-    this.maybeFail("selectOffer");
+    return this.timed("selectOffer", () => {
+      this.calls.push(`selectOffer:${offer.id}`);
+      this.maybeFail("selectOffer");
+    });
   }
   async addToCart(): Promise<void> {
-    this.calls.push("addToCart");
-    this.maybeFail("addToCart");
+    return this.timed("addToCart", () => {
+      this.calls.push("addToCart");
+      this.maybeFail("addToCart");
+    });
   }
   async readCart(): Promise<CartSummary> {
-    this.calls.push("readCart");
-    return { itemCount: 2, totalPrice: 240, currency: "EUR", items: [{ label: "x", quantity: 2, unitPrice: 120 }] };
+    return this.timed("readCart", () => {
+      this.calls.push("readCart");
+      return { itemCount: 2, totalPrice: 240, currency: "EUR", items: [{ label: "x", quantity: 2, unitPrice: 120 }] };
+    });
   }
   override async detectBlocker(): Promise<Blocker | null> {
-    return this.blocker;
+    return this.timed("detectBlocker", () => this.blocker);
   }
 }
 

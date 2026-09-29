@@ -1,0 +1,54 @@
+{
+  "name": "05",
+  "description": "La meilleure offre apparaît puis est vendue pendant la sélection : passage propre à l'offre suivante, sans la retenter.",
+  "config": {
+    "tickets": {
+      "quantity": 2,
+      "maxPricePerTicket": 150,
+      "categories": [
+        "A",
+        "B"
+      ],
+      "seatsTogether": true,
+      "seatsTogetherStrict": false
+    }
+  },
+  "latencyMs": {
+    "fetchSale": 5,
+    "selectOffer": 500,
+    "addToCart": 30,
+    "readCart": 5
+  },
+  "maxWaitMs": 4000,
+  "offers": [
+    {
+      "id": "a-fugace",
+      "category": "A",
+      "price": 80,
+      "available": 2,
+      "seats": [
+        "1",
+        "2"
+      ],
+      "soldAtMs": 250
+    },
+    {
+      "id": "b-stable",
+      "category": "B",
+      "price": 90,
+      "available": 2,
+      "seats": [
+        "5",
+        "6"
+      ]
+    }
+  ],
+  "expect": {
+    "status": "in-cart",
+    "finalState": "CART_SUCCESS",
+    "offerId": "b-stable",
+    "attempts": 2
+  },
+  "saleOpensAfterMs": 300,
+  "humanResolveMs": 150
+}

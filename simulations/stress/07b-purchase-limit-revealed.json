@@ -1,0 +1,57 @@
+{
+  "name": "07b",
+  "description": "Limite du site = 2 révélée à la sélection : arrêt définitif, aucune insistance, aucune cession de main.",
+  "config": {
+    "tickets": {
+      "quantity": 4,
+      "maxPricePerTicket": 200,
+      "categories": [],
+      "seatsTogether": true,
+      "seatsTogetherStrict": false
+    }
+  },
+  "purchaseLimit": 2,
+  "declareLimit": false,
+  "offers": [
+    {
+      "id": "quatre-a",
+      "category": "A",
+      "price": 80,
+      "available": 4,
+      "seats": [
+        "1",
+        "2",
+        "3",
+        "4"
+      ]
+    },
+    {
+      "id": "quatre-b",
+      "category": "A",
+      "price": 85,
+      "available": 4,
+      "seats": [
+        "5",
+        "6",
+        "7",
+        "8"
+      ]
+    }
+  ],
+  "expect": {
+    "status": "blocked",
+    "finalState": "PURCHASE_LIMIT",
+    "failureReason": "PURCHASE_LIMIT",
+    "attempts": 1,
+    "humanHandoffs": 0
+  },
+  "saleOpensAfterMs": 300,
+  "latencyMs": {
+    "fetchSale": 5,
+    "selectOffer": 20,
+    "addToCart": 30,
+    "readCart": 5
+  },
+  "humanResolveMs": 150,
+  "maxWaitMs": 2500
+}

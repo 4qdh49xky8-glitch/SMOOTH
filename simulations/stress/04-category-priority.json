@@ -1,0 +1,64 @@
+{
+  "name": "04",
+  "description": "Plusieurs offres dans le budget : l'ordre des catégories est respecté (C, puis A, puis B) même si B est moins chère.",
+  "config": {
+    "tickets": {
+      "quantity": 2,
+      "maxPricePerTicket": 150,
+      "categories": [
+        "C",
+        "A",
+        "B"
+      ],
+      "seatsTogether": true,
+      "seatsTogetherStrict": false
+    }
+  },
+  "offers": [
+    {
+      "id": "b",
+      "category": "B",
+      "price": 40,
+      "available": 2,
+      "seats": [
+        "1",
+        "2"
+      ]
+    },
+    {
+      "id": "a",
+      "category": "A",
+      "price": 60,
+      "available": 2,
+      "seats": [
+        "3",
+        "4"
+      ]
+    },
+    {
+      "id": "c",
+      "category": "C",
+      "price": 110,
+      "available": 2,
+      "seats": [
+        "5",
+        "6"
+      ]
+    }
+  ],
+  "expect": {
+    "status": "in-cart",
+    "finalState": "CART_SUCCESS",
+    "offerId": "c",
+    "attempts": 1
+  },
+  "saleOpensAfterMs": 300,
+  "latencyMs": {
+    "fetchSale": 5,
+    "selectOffer": 20,
+    "addToCart": 30,
+    "readCart": 5
+  },
+  "humanResolveMs": 150,
+  "maxWaitMs": 2500
+}

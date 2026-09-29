@@ -1,0 +1,45 @@
+{
+  "name": "07a",
+  "description": "Limite du site = 2 (connue) et quantité 4 : arrêt immédiat, avant toute action sur le site.",
+  "config": {
+    "tickets": {
+      "quantity": 4,
+      "maxPricePerTicket": 200,
+      "categories": [],
+      "seatsTogether": true,
+      "seatsTogetherStrict": false
+    }
+  },
+  "purchaseLimit": 2,
+  "declareLimit": true,
+  "offers": [
+    {
+      "id": "quatre",
+      "category": "A",
+      "price": 80,
+      "available": 4,
+      "seats": [
+        "1",
+        "2",
+        "3",
+        "4"
+      ]
+    }
+  ],
+  "expect": {
+    "status": "blocked",
+    "finalState": "PURCHASE_LIMIT",
+    "failureReason": "PURCHASE_LIMIT",
+    "attempts": 0,
+    "humanHandoffs": 0
+  },
+  "saleOpensAfterMs": 300,
+  "latencyMs": {
+    "fetchSale": 5,
+    "selectOffer": 20,
+    "addToCart": 30,
+    "readCart": 5
+  },
+  "humanResolveMs": 150,
+  "maxWaitMs": 2500
+}

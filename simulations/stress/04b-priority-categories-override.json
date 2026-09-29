@@ -1,0 +1,61 @@
+{
+  "name": "04b",
+  "description": "strategy.priorityCategories passe avant l'ordre de tickets.categories.",
+  "config": {
+    "tickets": {
+      "quantity": 2,
+      "maxPricePerTicket": 150,
+      "categories": [
+        "A",
+        "B",
+        "C"
+      ],
+      "seatsTogether": true,
+      "seatsTogetherStrict": false
+    },
+    "strategy": {
+      "priority": [
+        "category",
+        "price"
+      ],
+      "priorityCategories": [
+        "B"
+      ]
+    }
+  },
+  "offers": [
+    {
+      "id": "a",
+      "category": "A",
+      "price": 40,
+      "available": 2
+    },
+    {
+      "id": "b",
+      "category": "B",
+      "price": 100,
+      "available": 2
+    },
+    {
+      "id": "c",
+      "category": "C",
+      "price": 50,
+      "available": 2
+    }
+  ],
+  "expect": {
+    "status": "in-cart",
+    "finalState": "CART_SUCCESS",
+    "offerId": "b",
+    "attempts": 1
+  },
+  "saleOpensAfterMs": 300,
+  "latencyMs": {
+    "fetchSale": 5,
+    "selectOffer": 20,
+    "addToCart": 30,
+    "readCart": 5
+  },
+  "humanResolveMs": 150,
+  "maxWaitMs": 2500
+}

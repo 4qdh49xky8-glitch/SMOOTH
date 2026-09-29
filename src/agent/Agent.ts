@@ -1,7 +1,7 @@
 import type { BotConfig } from "../config/schema.js";
 import { notify } from "../notifications/notify.js";
 import { assertCompliant } from "../sites/compliance.js";
-import type { AdapterContext, Blocker, CartSummary, Offer, SiteAdapter } from "../sites/SiteAdapter.js";
+import type { AdapterContext, Blocker, CartSummary, Offer, SaleSnapshot, SiteAdapter } from "../sites/SiteAdapter.js";
 import { sanitize, Telemetry, type TelemetryRecord } from "../telemetry/Telemetry.js";
 import { Clock, estimateOffset, httpDateServerTime } from "../utils/clock.js";
 import {
@@ -15,12 +15,18 @@ import {
 } from "../utils/errors.js";
 import type { Logger } from "../utils/logger.js";
 import { waitForEnter } from "../utils/prompt.js";
+import { redact } from "../utils/redact.js";
 import { waitUntil } from "../utils/scheduler.js";
 import type { ClaudeAssistant } from "./claude.js";
 import { explainOffer, rankOffers, verifyCart } from "./matcher.js";
-import { AUTO_DETECTABLE, reasonForState, State, type FailureReason } from "./states.js";
+import { AUTO_DETECTABLE, reasonForState, State, type BlockingState, type FailureReason } from "./states.js";
 
-export type RunStatus = "in-cart" | "ready-not-added" | "sale-timeout" | "blocked" | "error";
+/**
+ * in-cart          panier vérifié conforme
+ * cart-mismatch    billets ajoutés mais panier non conforme (quantité/prix) ou illisible : à vérifier À LA MAIN
+ * ready-not-added  offre sélectionnée, ajout laissé à l'humain (autoAddToCart=false)
+ */
+export type RunStatus = "in-cart" | "ready-not-added" | "cart-mismatch" | "sale-timeout" | "blocked" | "error";
 
 export interface RunResult {
   status: RunStatus;
@@ -54,6 +60,8 @@ export interface AgentDeps {
   /** Remplaçables (tests, simulation) ; par défaut : notification OS/terminal et attente dans le terminal. */
   notifier?: typeof notify;
   awaitHuman?: (blocker: Blocker) => Promise<void>;
+  /** Attente de la confirmation humaine (Entrée). Remplaçable pour tester la vraie attente. */
+  waitForEnter?: typeof waitForEnter;
 }
 
 type BuildExtra = Partial<Pick<RunResult, "failureReason" | "offer" | "cart" | "cartOk" | "problems" | "blocker">>;
@@ -61,9 +69,31 @@ interface Outcome {
   status: RunStatus;
   finalState: State;
   extra: BuildExtra;
+  attempt: { outcome: "cart" | "selected" | "error"; reason?: FailureReason };
 }
 
+/** États détectés AVANT toute tentative de sélection. Les autres (limite d'achat, choix manuel) ne se jugent qu'après un échec, sinon une simple bannière d'information suffirait à stopper le run. */
+const PREFLIGHT_STATES: readonly BlockingState[] = ["QUEUE", "CAPTCHA", "BLOCKED", "LOGIN_REQUIRED"];
+/** Après une cession de main, un blocage encore détecté n'en redéclenche pas une autre pendant ce délai (évite une boucle de cessions). */
+const HUMAN_ACK_MS = 15_000;
+
+/** Lecture de l'état de la page : au-delà, on la considère absente (une page occupée ne doit jamais geler la surveillance). */
+const BLOCKER_CHECK_TIMEOUT_MS = 250;
+/** Erreurs de lecture consécutives : attente exponentielle plafonnée, journalisation espacée. */
+const ERROR_BACKOFF_CAP_MS = 5000;
+
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+/** Résout avec la valeur de `p`, ou `fallback` après `ms` (minuteur libéré dès la fin : rien ne traîne en arrière-plan). */
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), ms);
+    p.then(
+      (v) => (clearTimeout(timer), resolve(v)),
+      () => (clearTimeout(timer), resolve(fallback)),
+    );
+  });
+}
 
 export class Agent {
   /** Exposé pour les tests. */
@@ -74,6 +104,8 @@ export class Agent {
   private state: State | null = null;
   private lastSaleState: State | null = null;
   private everOpen = false;
+  private readonly ackUntil = new Map<string, number>();
+  private readonly pending: Promise<unknown>[] = [];
 
   constructor(d: AgentDeps) {
     this.d = d;
@@ -90,8 +122,14 @@ export class Agent {
     });
   }
 
-  private notify(o: Parameters<typeof notify>[0]): Promise<void> {
-    return (this.d.notifier ?? notify)(o);
+  /**
+   * Notification NON bloquante (un webhook lent ne doit jamais retarder le bot) et assainie :
+   * les textes fournis par les sites (messages d'erreur, blocages) peuvent contenir des secrets.
+   */
+  private notify(o: Parameters<typeof notify>[0]): void {
+    const safe = { ...o, title: redact(o.title), message: redact(o.message) };
+    const p = Promise.resolve((this.d.notifier ?? notify)(safe)).catch(() => undefined);
+    this.pending.push(p);
   }
 
   private setState(s: State, detail?: string): void {
@@ -114,11 +152,7 @@ export class Agent {
     return result;
   }
 
-  private build(
-    status: RunStatus,
-    finalState: State,
-    extra: BuildExtra = {},
-  ): RunResult {
+  private build(status: RunStatus, finalState: State, extra: BuildExtra = {}): RunResult {
     const telemetry = this.telemetry.finalize({
       status,
       finalState,
@@ -150,13 +184,24 @@ export class Agent {
     const { config, adapter, ctx, clock } = this.d;
     this.log.info(`Événement « ${config.event.name} » — ouverture ${config.sale.startTime} — site « ${adapter.meta.id} »`);
 
+    // Limite d'achat officielle connue : on ne tente rien qui la dépasse (ni ne la contourne). Aucun appel au site.
+    const cap = adapter.meta.capabilities.maxTicketsPerOrder;
+    if (cap !== undefined && config.tickets.quantity > cap) {
+      const blocker: Blocker = {
+        state: "PURCHASE_LIMIT",
+        message: `quantité demandée (${config.tickets.quantity}) supérieure à la limite d'achat du site (${cap}) : le bot ne contourne pas les limites`,
+      };
+      this.setState(State.PURCHASE_LIMIT, blocker.message);
+      throw new StopRunError(blocker);
+    }
+
     await this.syncClock();
 
     // Phase 1 : préparation à T − preArm (connexion, chargement, connexions chaudes).
     const armAt = this.saleEpochMs - config.timing.preArmSeconds * 1000;
     if (clock.now() < armAt) {
       this.log.info(`Attente jusqu'à la préparation (${new Date(armAt).toISOString()})…`);
-      await waitUntil(armAt, clock, { spinThresholdMs: 1000 });
+      await waitUntil(armAt, clock, { spinThresholdMs: 50 }); // précision suffisante ; pas d'attente active longue
     }
     await this.step("login", () => adapter.ensureLoggedIn(ctx));
     this.log.info("Compte connecté.");
@@ -186,7 +231,7 @@ export class Agent {
       const fetcher = adapter.getServerTime
         ? () => adapter.getServerTime!(ctx)
         : () => httpDateServerTime(adapter.resolveEventUrl(config));
-      const est = await estimateOffset(fetcher);
+      const est = await estimateOffset(fetcher, adapter.getServerTime ? 7 : 3); // en-tête Date : résolution 1 s, plus d'échantillons n'apporteraient rien
       clock.offsetMs = est.offsetMs;
       this.telemetry.setClock(est.offsetMs, est.rttMs);
       this.log.info(
@@ -201,23 +246,41 @@ export class Agent {
   private async watchAndBuy(): Promise<RunResult> {
     const { config, adapter, ctx, clock } = this.d;
     const deadline = this.saleEpochMs + config.timing.maxWaitAfterSaleSeconds * 1000;
+    const cooldown = new Map<string, number>(); // offre → instant avant lequel on ne la retente pas
     let attempts = 0;
+    let readErrors = 0;
     let lastSummary = "";
 
     while (clock.now() < deadline) {
       const t0 = clock.now();
-      let snapshot;
+      let snapshot: SaleSnapshot;
+      let blocker: Blocker | null;
       try {
-        snapshot = await adapter.fetchSale(ctx);
+        // Disponibilité (HTTP) et état de la page (lecture seule) EN PARALLÈLE : aucune latence ajoutée,
+        // et aucune sélection n'est tentée si une file d'attente / un CAPTCHA / un contrôle anti-bot est affiché.
+        [snapshot, blocker] = await Promise.all([
+          adapter.fetchSale(ctx),
+          withTimeout(adapter.detectBlocker(ctx), BLOCKER_CHECK_TIMEOUT_MS, null),
+        ]);
         this.telemetry.poll(clock.now() - t0);
+        readErrors = 0;
       } catch (err) {
         if (err instanceof RateLimitedError) {
           this.log.warn(err.message);
           await sleep(err.retryAfterMs);
           continue;
         }
-        this.log.warn(`Lecture de la vente : ${(err as Error).message}`);
-        await sleep(config.timing.pollIntervalMs);
+        // Panne persistante (réseau, site) : on ne martèle pas à cadence fixe et on n'inonde pas les logs.
+        readErrors++;
+        if (readErrors <= 2 || (readErrors & (readErrors - 1)) === 0) {
+          this.log.warn(`Lecture de la vente : ${(err as Error).message}${readErrors > 2 ? ` (échec n°${readErrors}, logs espacés)` : ""}`);
+        }
+        await sleep(Math.min(ERROR_BACKOFF_CAP_MS, config.timing.pollIntervalMs * 2 ** Math.min(readErrors - 1, 5)));
+        continue;
+      }
+
+      if (blocker && PREFLIGHT_STATES.includes(blocker.state) && (this.ackUntil.get(blocker.state) ?? 0) < clock.now()) {
+        await this.handoff(blocker); // aucune action sur le site tant que l'humain n'a pas traité le blocage
         continue;
       }
 
@@ -232,7 +295,8 @@ export class Agent {
           this.log.info("Disponibilité détectée.");
         }
 
-        const ranked = rankOffers(snapshot.offers, config.tickets, config.strategy);
+        const now = clock.now();
+        const ranked = rankOffers(snapshot.offers, config.tickets, config.strategy).filter((o) => (cooldown.get(o.id) ?? 0) <= now);
         const summary = `${snapshot.offers.length} offres, ${ranked.length} correspondent`;
         if (summary !== lastSummary) {
           lastSummary = summary;
@@ -248,10 +312,11 @@ export class Agent {
           try {
             const outcome = await this.tryOffer(offer);
             // La tentative est enregistrée AVANT la finalisation du rapport (sinon elle n'y figurerait pas).
-            this.telemetry.attempt({ ...meta, outcome: outcome.status === "in-cart" ? "cart" : "selected", durationMs: clock.now() - started });
+            this.telemetry.attempt({ ...meta, ...outcome.attempt, durationMs: clock.now() - started });
             return this.build(outcome.status, outcome.finalState, outcome.extra);
           } catch (err) {
             if (err instanceof OfferUnavailableError) {
+              cooldown.set(offer.id, clock.now() + config.cart.unavailableCooldownMs);
               this.telemetry.attempt({ ...meta, outcome: "unavailable", reason: "OFFER_UNAVAILABLE", durationMs: clock.now() - started });
               this.log.warn(`Offre ${offer.id} indisponible (${err.message}) — suivante.`);
               continue;
@@ -266,9 +331,9 @@ export class Agent {
         }
       }
 
-      // Cadence volontairement limitée : mesurée depuis le DÉBUT de la requête (pas de cumul).
-      const jitter = Math.random() * config.timing.pollJitterMs;
-      const wait = config.timing.pollIntervalMs + jitter - (clock.now() - t0);
+      // Cadence volontairement limitée, mesurée depuis le DÉBUT de la requête (pas de cumul). Vente complète : on ralentit.
+      const base = this.lastSaleState === State.SOLD_OUT ? Math.max(config.timing.pollIntervalMs, config.timing.soldOutPollIntervalMs) : config.timing.pollIntervalMs;
+      const wait = base + Math.random() * config.timing.pollJitterMs - (clock.now() - t0);
       if (wait > 0) await sleep(wait);
     }
     return this.timeout(this.everOpen ? "NO_MATCHING_OFFER" : "SALE_NOT_OPEN_TIMEOUT");
@@ -282,19 +347,26 @@ export class Agent {
 
   private async tryOffer(offer: Offer): Promise<Outcome> {
     const { config, adapter, ctx } = this.d;
+    const quantity = config.tickets.quantity;
     this.log.info(
       `Tentative : ${offer.category} · ${offer.pricePerTicket} ${offer.currency}/billet · id=${offer.id} · côte à côte=${String(offer.seatsTogether)}`,
     );
-    await this.step("selectOffer", () => adapter.selectOffer(ctx, offer, config.tickets.quantity));
-    if (adapter.selectSeats) await this.step("selectSeats", () => adapter.selectSeats!(ctx, offer, config.tickets.quantity));
+    await this.step("selectOffer", () => adapter.selectOffer(ctx, offer, quantity));
+    if (adapter.selectSeats) await this.step("selectSeats", () => adapter.selectSeats!(ctx, offer, quantity));
     this.telemetry.mark("offer-selected");
 
     if (!config.behavior.autoAddToCart) {
       this.setState(State.MANUAL_SELECTION, "autoAddToCart=false");
-      return { status: "ready-not-added", finalState: State.MANUAL_SELECTION, extra: { offer } };
+      return { status: "ready-not-added", finalState: State.MANUAL_SELECTION, extra: { offer }, attempt: { outcome: "selected" } };
     }
     await this.step("addToCart", () => adapter.addToCart(ctx));
     this.telemetry.mark("added-to-cart");
+    // Notification IMMÉDIATE (avant la relecture du panier) : c'est ce qui compte quand chaque seconde compte.
+    this.notify({
+      title: "🎟️ PANIER OBTENU — finalisez le paiement vous-même",
+      message: `${offer.category} — ${quantity} billet(s) à ${offer.pricePerTicket} ${offer.currency}. Vérification du panier en cours…`,
+      ...config.notifications,
+    });
 
     let cart: CartSummary | undefined;
     try {
@@ -303,9 +375,29 @@ export class Agent {
     } catch (err) {
       this.log.warn(`Ajout effectué mais lecture du panier impossible : ${(err as Error).message}`);
     }
-    const check = cart ? verifyCart(cart, config.tickets) : { ok: false, problems: ["panier non relu — à vérifier manuellement"] };
+
+    if (!cart) {
+      this.setState(State.ERROR, "CART_UNVERIFIED");
+      return {
+        status: "cart-mismatch",
+        finalState: State.ERROR,
+        extra: { offer, cartOk: false, problems: ["panier non relu — à vérifier manuellement"], failureReason: "CART_UNVERIFIED" },
+        attempt: { outcome: "error", reason: "CART_UNVERIFIED" },
+      };
+    }
+    const check = verifyCart(cart, config.tickets);
+    if (!check.ok) {
+      // Panier incomplet ou hors budget : on NE le déclare PAS réussi, on n'empile pas d'autres ajouts, l'humain tranche.
+      this.setState(State.ERROR, "CART_MISMATCH");
+      return {
+        status: "cart-mismatch",
+        finalState: State.ERROR,
+        extra: { offer, cart, cartOk: false, problems: check.problems, failureReason: "CART_MISMATCH" },
+        attempt: { outcome: "error", reason: "CART_MISMATCH" },
+      };
+    }
     this.setState(State.CART_SUCCESS);
-    return { status: "in-cart", finalState: State.CART_SUCCESS, extra: { offer, cart, cartOk: check.ok, problems: check.problems } };
+    return { status: "in-cart", finalState: State.CART_SUCCESS, extra: { offer, cart, cartOk: true, problems: [] }, attempt: { outcome: "cart" } };
   }
 
   /**
@@ -360,7 +452,7 @@ export class Agent {
       throw new HumanRequiredError(`Action humaine requise (${blocker.state}: ${blocker.message}) mais le navigateur est en mode headless.`);
     }
     await ctx.page.bringToFront().catch(() => undefined);
-    await this.notify({
+    this.notify({
       title: "🖐️ Action requise",
       message: `${blocker.message}. Traitez-le dans la fenêtre du navigateur ; le bot reprendra ensuite (automatiquement ou avec Entrée ici).`,
       ...config.notifications,
@@ -371,17 +463,22 @@ export class Agent {
     } else {
       // Connexion / étape humaine : rien à détecter côté page, seule la confirmation humaine compte.
       const detectable = AUTO_DETECTABLE.includes(blocker.state);
-      const enter = waitForEnter(
-        detectable
-          ? "Appuyez sur Entrée quand c'est réglé (ou attendez la détection automatique)."
-          : "Appuyez sur Entrée quand c'est fait.",
+      const enter = (this.d.waitForEnter ?? waitForEnter)(
+        detectable ? "Appuyez sur Entrée quand c'est réglé (ou attendez la détection automatique)." : "Appuyez sur Entrée quand c'est fait.",
       );
-      let cleared = false;
+      // Détection automatique ANNULABLE : dès la reprise, plus aucune lecture de la page en arrière-plan.
+      const ctl = { stopped: false, timer: undefined as NodeJS.Timeout | undefined, wake: undefined as (() => void) | undefined };
+      const nap = (ms: number): Promise<void> =>
+        new Promise((res) => {
+          ctl.wake = res;
+          ctl.timer = setTimeout(res, ms);
+        });
       const auto = detectable
         ? (async () => {
             let clean = 0;
-            while (!cleared) {
-              await sleep(500);
+            while (!ctl.stopped) {
+              await nap(500);
+              if (ctl.stopped) return;
               const b = await adapter.detectBlocker(ctx).catch(() => blocker);
               clean = b ? 0 : clean + 1;
               if (clean >= 2) return;
@@ -389,9 +486,13 @@ export class Agent {
           })()
         : new Promise<void>(() => undefined);
       await Promise.race([enter.promise, auto]);
-      cleared = true;
+      ctl.stopped = true;
+      clearTimeout(ctl.timer);
+      ctl.wake?.();
       enter.cancel();
+      if (detectable) await auto; // la boucle est terminée avant de reprendre : aucune action concurrente
     }
+    this.ackUntil.set(blocker.state, this.d.clock.now() + HUMAN_ACK_MS);
     this.state = before; // retour à l'état précédent (le blocage est levé)
     this.log.info("Reprise du bot.");
   }
@@ -402,15 +503,15 @@ export class Agent {
     const opts = config.notifications;
 
     if (result.status === "blocked") {
-      await this.notify({
+      this.notify({
         title: "⛔ Arrêt du bot",
         message: `${result.blocker?.message ?? "Blocage"}. Le bot ne contourne pas les limites du site : vérifiez votre compte/panier manuellement.`,
         ...opts,
       });
     } else if (result.status === "error") {
-      await this.notify({ title: "❌ Erreur du bot", message: `Raison : ${result.failureReason}. Consultez les logs.`, ...opts });
+      this.notify({ title: "❌ Erreur du bot", message: `Raison : ${result.failureReason}. Consultez les logs.`, ...opts });
     } else if (result.status === "sale-timeout") {
-      await this.notify({
+      this.notify({
         title: "⏱️ Aucun panier obtenu",
         message: `Raison : ${result.failureReason} (état ${result.finalState}). Aucune offre correspondant à vos critères n'a pu être ajoutée.`,
         ...opts,
@@ -418,21 +519,24 @@ export class Agent {
     } else {
       await ctx.page.bringToFront().catch(() => undefined);
       if (result.status === "ready-not-added") {
-        await this.notify({
+        this.notify({
           title: "🎟️ Offre sélectionnée (non ajoutée)",
           message: `${result.offer?.category} — ${result.offer?.pricePerTicket} ${result.offer?.currency}/billet. Ajoutez au panier manuellement.`,
           ...opts,
         });
-      } else {
-        const c = result.cart;
-        const detail = c ? `${c.itemCount} billet(s), total ${c.totalPrice} ${c.currency}` : "panier à vérifier";
-        const expiry = c?.expiresAt ? `\nRéservation jusqu'à ${new Date(c.expiresAt).toLocaleTimeString()}` : "";
-        const warn = result.cartOk ? "" : `\n⚠️ À vérifier : ${(result.problems ?? []).join("; ")}`;
-        await this.notify({
-          title: "🎟️ PANIER OBTENU — finalisez le paiement vous-même",
-          message: `${result.offer?.category} — ${detail}${expiry}${warn}`,
+      } else if (result.status === "cart-mismatch") {
+        this.notify({
+          title: "⚠️ PANIER À VÉRIFIER — ne payez pas sans contrôle",
+          message: `Des billets ont été ajoutés mais le panier n'est pas conforme à votre demande : ${(result.problems ?? []).join("; ")}.`,
           ...opts,
         });
+      } else {
+        // La notification « PANIER OBTENU » est partie dès l'ajout ; on journalise ici le détail vérifié.
+        const c = result.cart;
+        if (c) {
+          const expiry = c.expiresAt ? ` — réservation jusqu'à ${new Date(c.expiresAt).toLocaleTimeString()}` : "";
+          this.log.info(`Panier vérifié : ${c.itemCount} billet(s), total ${c.totalPrice} ${c.currency}${expiry}`);
+        }
       }
     }
 
@@ -444,5 +548,6 @@ export class Agent {
     this.log.debug(`Chronologie :\n${result.timeline.map((t) => `  ${t.name.padEnd(22)} T+${t.tMs} ms`).join("\n")}`);
     result.telemetryFile = this.telemetry.save(result.telemetry);
     if (result.telemetryFile) this.log.info(`Télémétrie locale : ${result.telemetryFile}`);
+    await Promise.allSettled(this.pending); // les notifications ont fini d'être envoyées avant de rendre la main
   }
 }

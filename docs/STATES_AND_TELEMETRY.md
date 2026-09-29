@@ -31,13 +31,23 @@ terminal). En `headless`, la cession est impossible : `ERROR` / `HUMAN_REQUIRED_
 | `in-cart` | `CART_SUCCESS` | — |
 | `ready-not-added` (`autoAddToCart=false`) | `MANUAL_SELECTION` | — |
 | `sale-timeout` | `SOLD_OUT`, `AVAILABLE`, `ERROR` | `NO_MATCHING_OFFER`, `MAX_ATTEMPTS`, `SALE_NOT_OPEN_TIMEOUT` |
+| `cart-mismatch` | `ERROR` | `CART_MISMATCH` (quantité/prix non conformes), `CART_UNVERIFIED` (panier illisible) |
 | `blocked` | `PURCHASE_LIMIT` (ou l'état bloquant) | `PURCHASE_LIMIT` |
 | `error` | `ERROR` | `ADAPTER_ERROR`, `SELECTOR_NOT_FOUND`, `RATE_LIMITED`, `HUMAN_REQUIRED_HEADLESS` |
 
 Raisons d'échec normalisées (`FailureReason`) : `SALE_NOT_OPEN_TIMEOUT`, `NO_MATCHING_OFFER`, `MAX_ATTEMPTS`,
-`OFFER_UNAVAILABLE`, `PURCHASE_LIMIT`, `QUEUE`, `CAPTCHA`, `LOGIN_REQUIRED`, `MANUAL_SELECTION`, `BLOCKED`,
+`OFFER_UNAVAILABLE`, `CART_MISMATCH`, `CART_UNVERIFIED`, `PURCHASE_LIMIT`, `QUEUE`, `CAPTCHA`, `LOGIN_REQUIRED`, `MANUAL_SELECTION`, `BLOCKED`,
 `HUMAN_REQUIRED_HEADLESS`, `SELECTOR_NOT_FOUND`, `RATE_LIMITED`, `ADAPTER_ERROR`. Le code de sortie de
-`npm start` est 0 pour `CART_SUCCESS` ou `ready-not-added`, 1 sinon.
+`npm start` est 0 pour `in-cart` ou `ready-not-added`, 1 sinon.
+
+**Panier non conforme** : si le site n'a ajouté qu'une partie des billets ou si le prix dépasse le budget, le panier
+n'est **jamais** déclaré réussi (`cart-mismatch`, état `ERROR`). Le bot alerte (« PANIER À VÉRIFIER »), n'ajoute rien
+d'autre (pas d'empilement de paniers) et laisse la main à l'humain. La notification « PANIER OBTENU » part **dès
+l'ajout**, avant la vérification ; la vérification la confirme ou la corrige.
+
+**Avant toute sélection**, à chaque lecture de disponibilité, le bot lit aussi l'état de la page (en parallèle, sans
+latence ajoutée, borné à 250 ms) : file d'attente, CAPTCHA, anti-bot ou connexion affichés ⇒ cession de la main sans
+aucune action sur le site.
 
 ## Télémétrie locale
 

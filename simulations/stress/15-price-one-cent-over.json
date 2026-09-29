@@ -1,0 +1,40 @@
+{
+  "name": "15",
+  "description": "Prix supérieur d'un centime au maximum : refusé.",
+  "config": {
+    "tickets": {
+      "quantity": 2,
+      "maxPricePerTicket": 120,
+      "categories": [],
+      "seatsTogether": true,
+      "seatsTogetherStrict": false
+    }
+  },
+  "maxWaitMs": 1200,
+  "offers": [
+    {
+      "id": "un-centime-de-trop",
+      "category": "A",
+      "price": 120.01,
+      "available": 2,
+      "seats": [
+        "1",
+        "2"
+      ]
+    }
+  ],
+  "expect": {
+    "status": "sale-timeout",
+    "finalState": "AVAILABLE",
+    "failureReason": "NO_MATCHING_OFFER",
+    "attempts": 0
+  },
+  "saleOpensAfterMs": 300,
+  "latencyMs": {
+    "fetchSale": 5,
+    "selectOffer": 20,
+    "addToCart": 30,
+    "readCart": 5
+  },
+  "humanResolveMs": 150
+}

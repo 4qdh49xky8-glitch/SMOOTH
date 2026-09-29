@@ -11,8 +11,6 @@
   },
   "browser": {
     "headless": false,
-    "userDataDir": ".profile",
-    "debugPort": 9222,
     "blockHeavyResources": true
   },
   "claude": {

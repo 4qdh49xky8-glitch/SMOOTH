@@ -1,0 +1,49 @@
+{
+  "name": "09a",
+  "description": "CAPTCHA affiché : le bot cède la main et n'agit plus tant qu'il est affiché.",
+  "config": {
+    "tickets": {
+      "quantity": 2,
+      "maxPricePerTicket": 150,
+      "categories": [],
+      "seatsTogether": true,
+      "seatsTogetherStrict": false
+    }
+  },
+  "blockWindows": [
+    {
+      "state": "CAPTCHA",
+      "fromMs": 0,
+      "untilMs": 1200
+    }
+  ],
+  "maxWaitMs": 4000,
+  "offers": [
+    {
+      "id": "o",
+      "category": "A",
+      "price": 90,
+      "available": 2,
+      "seats": [
+        "5",
+        "6"
+      ]
+    }
+  ],
+  "expect": {
+    "status": "in-cart",
+    "finalState": "CART_SUCCESS",
+    "humanHandoffs": 1,
+    "statesInclude": [
+      "CAPTCHA"
+    ]
+  },
+  "saleOpensAfterMs": 300,
+  "latencyMs": {
+    "fetchSale": 5,
+    "selectOffer": 20,
+    "addToCart": 30,
+    "readCart": 5
+  },
+  "humanResolveMs": 150
+}

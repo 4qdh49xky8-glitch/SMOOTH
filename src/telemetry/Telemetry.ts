@@ -2,6 +2,7 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import type { FailureReason, State } from "../agent/states.js";
+import { redact } from "../utils/redact.js";
 import type { Clock } from "../utils/clock.js";
 
 /**
@@ -48,13 +49,9 @@ export interface TelemetryRecord {
   cart?: { itemCount: number; totalPrice: number; currency: string };
 }
 
-/** Retire URLs, e-mails et longues suites de chiffres d'un texte libre, puis le tronque. */
+/** Retire URLs, e-mails, clés, cartes et longues suites de chiffres d'un texte libre, puis le tronque. */
 export function sanitize(text: string, max = 160): string {
-  return text
-    .replace(/https?:\/\/\S+/gi, "<url>")
-    .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, "<email>")
-    .replace(/\d{6,}/g, "<num>")
-    .slice(0, max);
+  return redact(text, { urls: "drop", minDigits: 6, tokens: true }).slice(0, max);
 }
 
 const round = (n: number): number => Math.round(n * 10) / 10;

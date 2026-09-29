@@ -1,0 +1,60 @@
+{
+  "name": "13",
+  "description": "Événement sans catégorie : categories=[] accepte toutes les catégories (et libellés inattendus).",
+  "config": {
+    "tickets": {
+      "quantity": 2,
+      "maxPricePerTicket": 150,
+      "categories": [],
+      "seatsTogether": true,
+      "seatsTogetherStrict": false
+    }
+  },
+  "offers": [
+    {
+      "id": "vide",
+      "category": "",
+      "price": 70,
+      "available": 2,
+      "seats": [
+        "1",
+        "2"
+      ]
+    },
+    {
+      "id": "exotique",
+      "category": "Zone Ω — Loge n°7",
+      "price": 60,
+      "available": 2,
+      "seats": [
+        "3",
+        "4"
+      ]
+    },
+    {
+      "id": "standard",
+      "category": "Standard",
+      "price": 80,
+      "available": 2,
+      "seats": [
+        "5",
+        "6"
+      ]
+    }
+  ],
+  "expect": {
+    "status": "in-cart",
+    "finalState": "CART_SUCCESS",
+    "offerId": "exotique",
+    "attempts": 1
+  },
+  "saleOpensAfterMs": 300,
+  "latencyMs": {
+    "fetchSale": 5,
+    "selectOffer": 20,
+    "addToCart": 30,
+    "readCart": 5
+  },
+  "humanResolveMs": 150,
+  "maxWaitMs": 2500
+}

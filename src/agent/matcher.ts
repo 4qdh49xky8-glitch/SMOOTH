@@ -9,6 +9,9 @@ export const normalize = (s: string): string =>
     .replace(/\s+/g, " ")
     .trim();
 
+/** Comparaison des prix en centimes : 120,00 accepté, 120,01 refusé, et pas de piège de virgule flottante (0,1 + 0,2). */
+export const cents = (n: number): number => Math.round(n * 100);
+
 export const DEFAULT_STRATEGY: Strategy = StrategySchema.parse({});
 
 const matchesAny = (value: string | undefined, patterns: string[]): boolean => {
@@ -43,7 +46,7 @@ function criterionKey(c: Criterion, o: Offer, t: TicketCriteria, s: Strategy): n
       return [section, row];
     }
     case "price":
-      return [s.priceOrder === "cheapest" ? o.pricePerTicket : -o.pricePerTicket];
+      return [s.priceOrder === "cheapest" ? cents(o.pricePerTicket) : -cents(o.pricePerTicket)];
     case "fit":
       return [o.available - t.quantity];
   }
@@ -60,19 +63,24 @@ const compareKeys = (a: number[], b: number[]): number => {
 /** Filtre (contraintes dures de `tickets`) puis classe selon `strategy`. */
 export function rankOffers(offers: Offer[], t: TicketCriteria, strategy: Strategy = DEFAULT_STRATEGY): Offer[] {
   const wanted = t.categories.map(normalize);
-  return offers
+  const budget = cents(t.maxPricePerTicket);
+  const kept = offers
     .filter((o) => o.available >= t.quantity)
-    .filter((o) => o.pricePerTicket <= t.maxPricePerTicket)
+    .filter((o) => cents(o.pricePerTicket) <= budget)
     .filter((o) => wanted.length === 0 || wanted.includes(normalize(o.category)))
     .filter((o) => !matchesAny(o.section, strategy.placement.excludeSections))
-    .filter((o) => !(t.seatsTogether && t.seatsTogetherStrict) || o.seatsTogether === true)
+    .filter((o) => !(t.seatsTogether && t.seatsTogetherStrict) || o.seatsTogether === true);
+  // Tri « décoré » : les clés sont calculées une seule fois par offre (pas à chaque comparaison).
+  return kept
+    .map((o) => ({ o, keys: strategy.priority.map((c) => criterionKey(c, o, t, strategy)) }))
     .sort((a, b) => {
-      for (const c of strategy.priority) {
-        const d = compareKeys(criterionKey(c, a, t, strategy), criterionKey(c, b, t, strategy));
+      for (let i = 0; i < a.keys.length; i++) {
+        const d = compareKeys(a.keys[i]!, b.keys[i]!);
         if (d) return d;
       }
-      return a.pricePerTicket - b.pricePerTicket || a.id.localeCompare(b.id); // départage stable
-    });
+      return cents(a.o.pricePerTicket) - cents(b.o.pricePerTicket) || a.o.id.localeCompare(b.o.id); // départage stable
+    })
+    .map((x) => x.o);
 }
 
 /** Détail des clés de tri d'une offre (journal DEBUG, `validate`). */
@@ -98,7 +106,7 @@ export function verifyCart(cart: CartSummary, c: TicketCriteria): { ok: boolean;
   const problems: string[] = [];
   if (cart.itemCount !== c.quantity) problems.push(`quantité ${cart.itemCount} ≠ ${c.quantity} demandée`);
   for (const it of cart.items) {
-    if (it.unitPrice > c.maxPricePerTicket) problems.push(`prix ${it.unitPrice} > budget ${c.maxPricePerTicket}`);
+    if (cents(it.unitPrice) > cents(c.maxPricePerTicket)) problems.push(`prix ${it.unitPrice} > budget ${c.maxPricePerTicket}`);
   }
   return { ok: problems.length === 0, problems };
 }

@@ -43,6 +43,9 @@ export interface CartSummary {
  *  - LOGIN_REQUIRED | MANUAL_SELECTION  : cession de la main, reprise quand l'humain confirme (Entrée) ;
  *  - PURCHASE_LIMIT                     : ARRÊT DÉFINITIF du run (limite d'achat du site, jamais contournée).
  */
+/** Alias pratique du type d'état bloquant. */
+export type BlockingStateAlias = BlockingState;
+
 export interface Blocker {
   state: BlockingState;
   message: string;
@@ -81,6 +84,11 @@ export interface AdapterMeta {
     reportsSeatAdjacency: boolean;
     /** none : pas de choix de places ; automatic : l'adaptateur choisit ; manual : l'humain choisit sur le plan. */
     seatSelection: "none" | "automatic" | "manual";
+    /**
+     * Limite d'achat officielle du site (billets par commande), si elle est connue à l'avance.
+     * Le cœur refuse de démarrer si `tickets.quantity` la dépasse : il ne tente jamais de la contourner.
+     */
+    maxTicketsPerOrder?: number;
   };
 }
 

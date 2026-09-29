@@ -1,5 +1,6 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { redact } from "./redact.js";
 
 export const LOG_LEVELS = ["silent", "error", "warn", "info", "debug"] as const;
 export type LogLevel = (typeof LOG_LEVELS)[number];
@@ -21,6 +22,8 @@ export interface LoggerOptions {
   file?: string;
   color?: boolean;
   scope?: string;
+  /** Assainit chaque message (URLs à jeton, e-mails, cartes, mots de passe). Défaut : true. Ne le désactivez pas en production. */
+  redact?: boolean;
   /** Sortie alternative (tests) : remplace la console. */
   sink?: (level: Exclude<LogLevel, "silent">, line: string) => void;
 }
@@ -50,6 +53,7 @@ export function createLogger(opts: LoggerOptions = {}): Logger {
 
   const emit = (lvl: Exclude<LogLevel, "silent">, scope: string | undefined, msg: string): void => {
     if (RANK[lvl] > RANK[level]) return;
+    if (opts.redact !== false) msg = redact(msg);
     const tag = scope ? `[${scope}] ` : "";
     if (opts.file) {
       if (!fileReady) {

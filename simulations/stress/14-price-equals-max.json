@@ -1,0 +1,40 @@
+{
+  "name": "14",
+  "description": "Prix exactement égal au maximum : accepté.",
+  "config": {
+    "tickets": {
+      "quantity": 2,
+      "maxPricePerTicket": 120,
+      "categories": [],
+      "seatsTogether": true,
+      "seatsTogetherStrict": false
+    }
+  },
+  "offers": [
+    {
+      "id": "pile",
+      "category": "A",
+      "price": 120,
+      "available": 2,
+      "seats": [
+        "1",
+        "2"
+      ]
+    }
+  ],
+  "expect": {
+    "status": "in-cart",
+    "finalState": "CART_SUCCESS",
+    "offerId": "pile",
+    "attempts": 1
+  },
+  "saleOpensAfterMs": 300,
+  "latencyMs": {
+    "fetchSale": 5,
+    "selectOffer": 20,
+    "addToCart": 30,
+    "readCart": 5
+  },
+  "humanResolveMs": 150,
+  "maxWaitMs": 2500
+}

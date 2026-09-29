@@ -19,8 +19,22 @@
     "autoPayment": false
   },
   "siteOptions": {},
-  "timing": { "preArmSeconds": 90, "pollIntervalMs": 400, "maxWaitAfterSaleSeconds": 900 },
-  "browser": { "headless": false, "userDataDir": ".profile", "debugPort": 9222, "blockHeavyResources": true },
-  "claude": { "enabled": false, "model": "claude-haiku-4-5-20251001", "maxCallsPerRun": 6 },
-  "notifications": { "desktop": true, "sound": true }
+  "timing": {
+    "preArmSeconds": 90,
+    "pollIntervalMs": 400,
+    "maxWaitAfterSaleSeconds": 900
+  },
+  "browser": {
+    "headless": false,
+    "blockHeavyResources": true
+  },
+  "claude": {
+    "enabled": false,
+    "model": "claude-haiku-4-5-20251001",
+    "maxCallsPerRun": 6
+  },
+  "notifications": {
+    "desktop": true,
+    "sound": true
+  }
 }

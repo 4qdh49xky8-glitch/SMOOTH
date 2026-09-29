@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { redact } from "../utils/redact.js";
 
 export interface NotifyOptions {
   title: string;
@@ -13,7 +14,10 @@ const run = (cmd: string, args: string[], env?: NodeJS.ProcessEnv): void => {
 };
 
 /** Notification immédiate : bannière terminal + bip + notification OS + webhook optionnel. */
-export async function notify({ title, message, desktop = true, sound = true }: NotifyOptions): Promise<void> {
+export async function notify(options: NotifyOptions): Promise<void> {
+  const { desktop = true, sound = true } = options;
+  const title = redact(options.title);
+  const message = redact(options.message);
   const line = "═".repeat(Math.max(title.length, 40) + 4);
   console.log(`\n${line}\n  ${title}\n  ${message.replace(/\n/g, "\n  ")}\n${line}\n${sound ? "\x07" : ""}`);
 

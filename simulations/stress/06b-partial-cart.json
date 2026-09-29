@@ -1,0 +1,45 @@
+{
+  "name": "06b",
+  "description": "Le site n'ajoute que 2 billets sur 4 demandés : le panier n'est PAS déclaré réussi.",
+  "config": {
+    "tickets": {
+      "quantity": 4,
+      "maxPricePerTicket": 200,
+      "categories": [],
+      "seatsTogether": true,
+      "seatsTogetherStrict": false
+    }
+  },
+  "cart": {
+    "itemCount": 2
+  },
+  "offers": [
+    {
+      "id": "quatre",
+      "category": "A",
+      "price": 80,
+      "available": 4,
+      "seats": [
+        "1",
+        "2",
+        "3",
+        "4"
+      ]
+    }
+  ],
+  "expect": {
+    "status": "cart-mismatch",
+    "finalState": "ERROR",
+    "failureReason": "CART_MISMATCH",
+    "attempts": 1
+  },
+  "saleOpensAfterMs": 300,
+  "latencyMs": {
+    "fetchSale": 5,
+    "selectOffer": 20,
+    "addToCart": 30,
+    "readCart": 5
+  },
+  "humanResolveMs": 150,
+  "maxWaitMs": 2500
+}

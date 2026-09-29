@@ -61,6 +61,8 @@ export function checkAdapterContract(adapter: SiteAdapter, opts: { sourceFile?: 
     for (const k of CAPABILITY_KEYS) if (caps[k] === undefined) err("CAPS_INCOMPLETE", `capabilities.${k} manquant`);
     if (!["none", "automatic", "manual"].includes(String(caps.seatSelection))) err("CAPS_SEATS", "capabilities.seatSelection ∈ none | automatic | manual");
     if (caps.seatSelection === "automatic" && typeof adapter.selectSeats !== "function") err("SEATS_METHOD", "seatSelection=automatic exige selectSeats()");
+    const cap = caps.maxTicketsPerOrder;
+    if (cap !== undefined && (!Number.isInteger(cap) || (cap as number) < 1)) err("CAPS_LIMIT", "capabilities.maxTicketsPerOrder doit être un entier ≥ 1");
     if (caps.preciseServerTime === true && typeof adapter.getServerTime !== "function") err("CLOCK_METHOD", "preciseServerTime=true exige getServerTime()");
     if (meta.compliance?.policy === "official-api" && caps.officialApi !== true) err("OFFICIAL_API", "policy=official-api exige capabilities.officialApi=true");
   }

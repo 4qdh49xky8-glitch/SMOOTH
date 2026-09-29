@@ -1,0 +1,49 @@
+{
+  "name": "17",
+  "description": "Connexion manuelle nécessaire avant l'ouverture : le bot attend l'humain.",
+  "config": {
+    "tickets": {
+      "quantity": 2,
+      "maxPricePerTicket": 150,
+      "categories": [],
+      "seatsTogether": true,
+      "seatsTogetherStrict": false
+    }
+  },
+  "failures": [
+    {
+      "step": "login",
+      "nth": 1,
+      "error": "LOGIN_REQUIRED"
+    }
+  ],
+  "offers": [
+    {
+      "id": "o",
+      "category": "A",
+      "price": 90,
+      "available": 2,
+      "seats": [
+        "5",
+        "6"
+      ]
+    }
+  ],
+  "expect": {
+    "status": "in-cart",
+    "finalState": "CART_SUCCESS",
+    "humanHandoffs": 1,
+    "statesInclude": [
+      "LOGIN_REQUIRED"
+    ]
+  },
+  "saleOpensAfterMs": 300,
+  "latencyMs": {
+    "fetchSale": 5,
+    "selectOffer": 20,
+    "addToCart": 30,
+    "readCart": 5
+  },
+  "humanResolveMs": 150,
+  "maxWaitMs": 2500
+}

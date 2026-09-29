@@ -1,0 +1,50 @@
+{
+  "name": "01",
+  "description": "2 billets côte à côte à 90 € vs 2 séparés à 70 € : seatsTogether=true → côte à côte.",
+  "config": {
+    "tickets": {
+      "quantity": 2,
+      "maxPricePerTicket": 150,
+      "categories": [],
+      "seatsTogether": true,
+      "seatsTogetherStrict": false
+    }
+  },
+  "offers": [
+    {
+      "id": "separes-70",
+      "category": "A",
+      "price": 70,
+      "available": 2,
+      "seats": [
+        "10",
+        "20"
+      ]
+    },
+    {
+      "id": "ensemble-90",
+      "category": "A",
+      "price": 90,
+      "available": 2,
+      "seats": [
+        "5",
+        "6"
+      ]
+    }
+  ],
+  "expect": {
+    "status": "in-cart",
+    "finalState": "CART_SUCCESS",
+    "offerId": "ensemble-90",
+    "attempts": 1
+  },
+  "saleOpensAfterMs": 300,
+  "latencyMs": {
+    "fetchSale": 5,
+    "selectOffer": 20,
+    "addToCart": 30,
+    "readCart": 5
+  },
+  "humanResolveMs": 150,
+  "maxWaitMs": 2500
+}

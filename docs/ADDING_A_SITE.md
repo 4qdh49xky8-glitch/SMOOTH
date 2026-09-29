@@ -79,9 +79,14 @@ readonly meta: AdapterMeta = {
     lightweightAvailability: true,  // fetchSale() sans rendu de page
     reportsSeatAdjacency: false,    // le site dit-il si des places sont côte à côte ?
     seatSelection: "manual",        // "none" | "automatic" (⇒ selectSeats()) | "manual" (l'humain choisit)
+    maxTicketsPerOrder: 4,          // (optionnel) limite d'achat officielle : le cœur refuse de démarrer au-delà, sans rien tenter
   },
 };
 ```
+
+`maxTicketsPerOrder` est la limite d'achat du site quand elle est connue à l'avance : si `tickets.quantity` la dépasse, le
+cœur s'arrête **avant tout appel** (`PURCHASE_LIMIT`) et `validate` le signale ; le bot ne cherche jamais à la contourner
+(ni par plusieurs commandes, ni par plusieurs comptes).
 
 Les capacités servent à `npm run validate` (avertit d'une stratégie incompatible, p. ex.
 `seatsTogetherStrict` sur un site qui ne renseigne pas l'adjacence) et au contrat (cohérence
@@ -105,7 +110,7 @@ motifs de paiement par défaut.
 | `selectSeats?(ctx, offer, qty)` | Choix des places | automatique, ou `BlockerError({state:"MANUAL_SELECTION"})` pour laisser l'humain choisir |
 | `addToCart(ctx)` *(abstraite)* | Ajout au panier | attendre la confirmation **ou** l'erreur (course d'événements), jamais de `sleep` |
 | `readCart(ctx)` *(abstraite)* | Lire le panier | quantité, prix unitaires, total, expiration si affichée |
-| `detectBlocker(ctx)` | État bloquant courant | lecture seule ; surchargez pour les marqueurs propres au site |
+| `detectBlocker(ctx)` | État bloquant courant | lecture seule, **rapide** (appelée à chaque lecture de disponibilité, bornée à 250 ms) ; surchargez pour les marqueurs propres au site (éléments balisés plutôt que texte) |
 | `validateOptions?(opts)` | Valide `siteOptions` | retourne des messages d'erreur (vide = OK) ; appelé par `npm run validate` |
 
 Squelette d'un `fetchSale` par API officielle :
@@ -239,4 +244,9 @@ sur un événement peu tendu **en votre présence**, et jamais sur une vente ré
 - **`seatsTogether: true` par défaut** « parce que ça arrive souvent » : faux positifs, l'utilisateur paie des places séparées.
 - **`sleep` sur le chemin chaud** : attendez un élément ou un événement, pas une durée.
 - **Clic sur un bouton dont le libellé contient « Payer/Commander »** : refusé par le scan du code et par le garde-fou.
+- **`detectBlocker` trop bavard** : il s'exécute avant chaque sélection ; une FAQ qui mentionne « file d'attente » ou une
+  bannière « limite de 4 billets par commande » ne doivent pas déclencher de cession de main. Les motifs par défaut
+  n'agissent que sur des pages courtes / des limites *atteintes* ; testez le vôtre sur des pages enregistrées.
+- **Chaîne de gabarit dans un script de page** : une apostrophe mal échappée dans un script évalué dans la page fait
+  échouer tout le script, et l'erreur est avalée (aucune détection). Utilisez `String.raw` (voir `selectors/blockers.ts`).
 - **Headless** : impossible de céder la main ; `validate` refuse `headless` avec `seatSelection: "manual"`.

@@ -92,6 +92,8 @@ export const ConfigSchema = z.object({
       pollJitterMs: z.number().min(0).default(50),
       /** Fenêtre de spin précis juste avant l'heure cible. */
       spinThresholdMs: z.number().min(0).default(25),
+      /** Intervalle entre deux lectures quand la vente est ouverte mais COMPLÈTE (SOLD_OUT) : évite une surveillance agressive inutile. */
+      soldOutPollIntervalMs: z.number().min(200).default(1000),
       maxWaitAfterSaleSeconds: z.number().min(1).default(900),
       actionTimeoutMs: z.number().min(500).default(4000),
     })
@@ -100,13 +102,17 @@ export const ConfigSchema = z.object({
     .object({
       /** Nombre max de tentatives d'ajout (offres épuisées entre-temps, etc.). */
       maxAttempts: z.number().int().min(1).default(5),
+      /** Une offre signalée indisponible n'est pas retentée avant ce délai (évite de marteler une liste périmée). */
+      unavailableCooldownMs: z.number().min(0).default(3000),
     })
     .default({}),
   browser: z
     .object({
       headless: z.boolean().default(false),
-      userDataDir: z.string().default(".profile"),
-      debugPort: z.number().int().default(9222),
+      /** Profil Chromium (votre session). Défaut : `.profile/<nom du profil>` — un navigateur par profil, jamais partagé. */
+      userDataDir: z.string().optional(),
+      /** Port CDP. 0 (défaut) = choisi automatiquement et lu dans le profil : deux instances ne se heurtent jamais. */
+      debugPort: z.number().int().min(0).default(0),
       blockHeavyResources: z.boolean().default(true),
       executablePath: z.string().optional(),
     })

@@ -34,7 +34,7 @@ const page = (title: string, body: string, head = ""): string =>
   `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${title}</title>${head}</head><body style="font-family:sans-serif;max-width:720px;margin:2rem auto">${body}</body></html>`;
 
 export function startDemoServer(opts: DemoOptions): Promise<{ url: string; server: Server; state: State; close: () => Promise<void> }> {
-  const state: State = { cart: [], addAttempts: 0, loggedIn: new Set() };
+  const state: State = { cart: [], addAttempts: 0, paymentHits: 0, loggedIn: new Set() };
   const isOpen = (): boolean => Date.now() >= opts.openAt;
   const inQueue = (): boolean => isOpen() && Date.now() < opts.openAt + (opts.queueMs ?? 0);
   const sid = (req: IncomingMessage): string | undefined => /(?:^|; )sid=([^;]+)/.exec(req.headers.cookie ?? "")?.[1];
@@ -62,8 +62,9 @@ export function startDemoServer(opts: DemoOptions): Promise<{ url: string; serve
     const url = new URL(req.url ?? "/", "http://x");
     const path = url.pathname;
 
+    if (path === "/payment") state.paymentHits++; // compté dès l'arrivée de la requête, connecté ou non
     if (path === "/api/time") return json(res, 200, { now: Date.now() });
-    if (path === "/__state") return json(res, 200, { cart: state.cart, addAttempts: state.addAttempts });
+    if (path === "/__state") return json(res, 200, { cart: state.cart, addAttempts: state.addAttempts, paymentHits: state.paymentHits });
 
     if (path === "/login" && req.method === "GET") {
       return send(res, 200, page("Connexion", `<h1>Connexion</h1><form method="post" action="/login">
@@ -156,6 +157,8 @@ export function startDemoServer(opts: DemoOptions): Promise<{ url: string; serve
 interface State {
   cart: { offerId: string; label: string; quantity: number; unitPrice: number; expiresAt: number }[];
   addAttempts: number;
+  /** Nombre de requêtes reçues sur la page de paiement : doit rester 0 tant que le bot tourne. */
+  paymentHits: number;
   loggedIn: Set<string>;
 }
 
