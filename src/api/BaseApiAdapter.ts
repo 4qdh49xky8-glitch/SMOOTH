@@ -2,7 +2,8 @@ import type { Page } from "playwright";
 import type { ApiClient } from "./ApiClient.js";
 import type { BotConfig } from "../config/schema.js";
 import { SelectorResolver } from "../selectors/resolver.js";
-import type { AdapterContext, AdapterMeta, Blocker, CartSummary, Offer, SaleSnapshot, SiteAdapter } from "../sites/SiteAdapter.js";
+import { authorizationOf, channelOf } from "../platforms/authorize.js";
+import type { AdapterAuthorization, AdapterContext, AdapterMeta, Availability, Blocker, CartSummary, EventInfo, Offer, SaleSnapshot, SiteAdapter } from "../sites/SiteAdapter.js";
 import type { Logger } from "../utils/logger.js";
 
 /**
@@ -25,8 +26,35 @@ export abstract class BaseApiAdapter implements SiteAdapter {
   readonly isApiAdapter = true;
   /** Client HTTP encadré de l'adaptateur : ses hôtes sont vérifiés contre le catalogue avant tout contact. */
   readonly client?: ApiClient;
-  networkHosts(): string[] {
+  get authorization(): AdapterAuthorization {
+    return authorizationOf(this.meta);
+  }
+  get channel(): "official-api" | "browser" {
+    return channelOf(this.meta);
+  }
+  get capabilities(): AdapterMeta["capabilities"] {
+    return this.meta.capabilities;
+  }
+  /** Hôtes de l'API officielle (ceux du client HTTP encadré) : vérifiés contre les domaines officiels avant tout contact. */
+  allowedHosts(_config?: BotConfig): string[] {
     return this.client ? this.client.hosts : [];
+  }
+  async getEvent(ctx: AdapterContext): Promise<EventInfo> {
+    return { url: this.resolveEventUrl(ctx.config), name: ctx.config.event.name };
+  }
+  async getAvailability(ctx: AdapterContext): Promise<Availability> {
+    const s = await this.listOffers(ctx);
+    return { open: s.open, soldOut: s.soldOut ?? (s.open && s.offers.every((o) => o.available <= 0)) };
+  }
+  async getOffers(ctx: AdapterContext): Promise<Offer[]> {
+    return (await this.listOffers(ctx)).offers;
+  }
+  /** Veto seulement : aucune exclusion propre à la plateforme par défaut. */
+  matchOffer(_offer: Offer, _criteria: BotConfig["tickets"]): boolean {
+    return true;
+  }
+  getCartState(ctx: AdapterContext): Promise<CartSummary> {
+    return this.readReservation(ctx);
   }
   /** Pas d'URL de paiement : aucun navigateur, et aucune opération de paiement n'existe dans l'interface. */
   readonly paymentUrlPatterns: RegExp[] = [];

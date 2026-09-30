@@ -54,8 +54,23 @@ export const STATUS_HELP: Record<PlatformStatus, string> = {
   NOT_ALLOWED: "automatisation interdite par la source (ou preuves sans canal commun) : aucune exécution automatisée",
 };
 
+/**
+ * MODÈLE FIGÉ — sémantique définitive des statuts (ne pas modifier sans raison majeure ; verrouillée par tests/authModelFrozen).
+ * `api` / `browser` : l'automatisation par ce canal est-elle autorisée ? Le mode humain (rappels, aucune requête vers la plateforme)
+ * reste possible dans tous les cas lorsqu'il est pertinent.
+ */
+export const AUTHORIZATION_MODEL: Readonly<Record<PlatformStatus, Readonly<{ api: boolean; browser: boolean }>>> = Object.freeze({
+  NOT_VERIFIED: Object.freeze({ api: false, browser: false }),
+  API_ONLY: Object.freeze({ api: true, browser: false }),
+  BROWSER_ONLY: Object.freeze({ api: false, browser: true }),
+  API_AND_BROWSER: Object.freeze({ api: true, browser: true }),
+  HUMAN_ONLY: Object.freeze({ api: false, browser: false }),
+  EXPIRED: Object.freeze({ api: false, browser: false }),
+  NOT_ALLOWED: Object.freeze({ api: false, browser: false }),
+});
+
 /** Statuts qui autorisent au moins un canal automatisé. */
-export const AUTOMATABLE: readonly PlatformStatus[] = ["API_ONLY", "BROWSER_ONLY", "API_AND_BROWSER"];
+export const AUTOMATABLE: readonly PlatformStatus[] = STATUSES.filter((s) => AUTHORIZATION_MODEL[s].api || AUTHORIZATION_MODEL[s].browser);
 
 export type Channel = "official-api" | "browser";
 

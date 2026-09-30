@@ -270,6 +270,8 @@ export class Agent {
     }
 
     await this.syncClock();
+    const event = await adapter.getEvent?.(ctx).catch(() => undefined);
+    if (event) this.log.info(`Événement : ${event.name ?? config.event.name} (${new URL(event.url).origin})`);
 
     // Phase 1 : préparation à T − preArm (connexion, chargement, connexions chaudes).
     const armAt = this.saleEpochMs - config.timing.preArmSeconds * 1000;
@@ -380,7 +382,8 @@ export class Agent {
 
         const now = clock.now();
         const decisionStart = performance.now();
-        const ranked = rankOffers(snapshot.offers, config.tickets, config.strategy).filter((o) => (cooldown.get(o.id) ?? 0) <= now);
+        // Le cœur décide (budget, quantité, catégories, stratégie) ; la plateforme ne peut qu'EXCLURE une offre (matchOffer = veto).
+        const ranked = rankOffers(snapshot.offers, config.tickets, config.strategy).filter((o) => (cooldown.get(o.id) ?? 0) <= now && adapter.matchOffer?.(o, config.tickets) !== false);
         if (ranked.length) this.telemetry.stage("decision", performance.now() - decisionStart);
         const summary = `${snapshot.offers.length} offres, ${ranked.length} correspondent`;
         if (summary !== lastSummary) {

@@ -28,12 +28,12 @@ test("le contrat détecte les manquements", () => {
 
 test("le contrat exige une autorisation relue récemment", () => {
   const reviewed = (date: string, policy: "permitted-by-terms" | "demo" = "permitted-by-terms"): SiteAdapter =>
-    patched((a) => ({ meta: { value: { ...a.meta, compliance: { policy, termsUrl: "https://a.example/cgu", reviewedAt: date } } } }));
+    patched((a) => ({ meta: { value: { ...a.meta, testOnly: policy === "demo" ? true : undefined, compliance: { policy, termsUrl: "https://a.example/cgu", reviewedAt: date } } } }));
   const now = Date.parse("2026-09-29");
   assert.deepEqual(codes(reviewed("2026-08-01"), now), []);
   assert.ok(codes(reviewed("2025-01-01"), now).includes("COMPLIANCE")); // > 180 jours
   assert.ok(codes(reviewed("pas-une-date"), now).includes("COMPLIANCE"));
-  assert.ok(codes(patched((a) => ({ meta: { value: { ...a.meta, compliance: { policy: "permitted-by-terms", termsUrl: "http://pas-https", reviewedAt: "2026-09-01" } } } })), now).includes("COMPLIANCE"));
+  assert.ok(codes(patched((a) => ({ meta: { value: { ...a.meta, testOnly: undefined, compliance: { policy: "permitted-by-terms", termsUrl: "http://pas-https", reviewedAt: "2026-09-01" } } } })), now).includes("COMPLIANCE"));
 });
 
 test("scan du code source : motifs interdits détectés, commentaires ignorés", () => {

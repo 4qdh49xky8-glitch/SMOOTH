@@ -29,7 +29,7 @@ export function adapter(id: string, o: { platform?: string; channel?: "official-
   const a = new FakeAdapter();
   const policy = o.policy ?? (o.channel === "official-api" ? "official-api" : "permitted-by-terms");
   a.meta = {
-    ...a.meta, id, platform: o.platform, channel: o.channel,
+    ...a.meta, id, platform: o.platform, channel: o.channel, testOnly: policy === "demo" ? true : undefined,
     compliance: policy === "demo" ? a.meta.compliance : { policy, termsUrl: `https://www.${o.platform ?? id}.example/conditions`, reviewedAt: TODAY },
     capabilities: { ...a.meta.capabilities, officialApi: o.channel === "official-api" },
     requires: o.env ? { env: o.env } : undefined,

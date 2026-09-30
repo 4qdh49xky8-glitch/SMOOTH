@@ -24,6 +24,7 @@ et laisse le navigateur ouvert pour que vous vérifiiez et payiez vous-même.
 | Commande | Rôle |
 |----------|------|
 | `npm run sites` | liste les adaptateurs, leur base d'autorisation et l'état de leur contrat |
+| `npm run test:fixtures` | kit de fixtures + contrat d'adaptateur : scénarios locaux (TEST_ONLY · NOT_A_REAL_PLATFORM) |
 | `npm run test:adapters` | vérifie automatiquement que **chaque** adaptateur respecte le contrat (`ADAPTER=<id>` pour un seul) |
 | `npm run validate -- config/event.json` | valide une configuration **sans contacter aucun site** (`-- concert` pour un profil, `-- --all` pour tous) |
 | `npm run profiles` | liste les profils de `config/events/` et leur validité |
@@ -62,7 +63,7 @@ src/
   agent/                   Agent.ts (cœur) · states.ts (10 états) · matcher.ts (filtre + stratégie) · claude.ts (secours)
   config/                  schema.ts · load.ts (profils, extends, migration V1) · validate.ts
   sites/                   SiteAdapter.ts (contrat) · BaseSiteAdapter.ts · compliance.ts · contract.ts · registry.ts (auto-découverte)
-                           ExampleSite.ts (seul adaptateur : démo locale, limité à localhost)
+                           ExampleSite.ts (TEST_ONLY · NOT_A_REAL_PLATFORM : fixture de démo, limitée à localhost)
   simulation/              scenario.ts · SimulationAdapter.ts · run.ts   (hors src/sites : jamais sélectionnable en réel)
   telemetry/               Telemetry.ts (métriques locales, assainissement, agrégats)
   browser/                 launch.ts (Chromium indépendant + CDP) · cdp.ts · guards.ts (garde-fou paiement)
@@ -92,6 +93,8 @@ Détail : [docs/SECURITY.md](docs/SECURITY.md).
 
 | Document | Contenu |
 |----------|---------|
+| [docs/ADAPTER_CONTRACT.md](docs/ADAPTER_CONTRACT.md) | **contrat d'adaptateur** : déclarations (authorization, allowedHosts, channel, capabilities), sept capacités, états, ApiClient, interdits |
+| [docs/FIXTURES.md](docs/FIXTURES.md) | **fixtures locales** pour tester un futur adaptateur : scénarios, faux site, suites de conformité (TEST_ONLY) |
 | [docs/SECURITY.md](docs/SECURITY.md) | **modèle d'autorisation par canal, preuves, verrous, reprise, réseau, secrets, Claude, limites** |
 | [docs/PLATFORMS.md](docs/PLATFORMS.md) | **catalogue et preuves** : statuts, format et refus des preuves (expiration 180 jours), historique, commandes, interface API, choix du canal API → navigateur → humain |
 | [docs/ADDING_A_SITE.md](docs/ADDING_A_SITE.md) | créer un adaptateur : autorisation d'abord, squelette, méthodes, états, offres, sélecteurs, tests, checklist |

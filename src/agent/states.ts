@@ -30,6 +30,13 @@ export const State = {
 } as const;
 export type State = (typeof State)[keyof typeof State];
 
+/**
+ * Les 10 états du CONTRAT d'adaptateur : ce dont un adaptateur et ses fixtures parlent. Les deux autres états
+ * (AUTHORIZATION_EXPIRED, MANUAL_INTERVENTION) sont produits par le cœur seul.
+ */
+export const ADAPTER_STATES = ["AVAILABLE", "SOLD_OUT", "QUEUE", "CAPTCHA", "LOGIN_REQUIRED", "MANUAL_SELECTION", "PURCHASE_LIMIT", "BLOCKED", "CART_SUCCESS", "ERROR"] as const satisfies readonly State[];
+export const CORE_ONLY_STATES = ["MANUAL_INTERVENTION", "AUTHORIZATION_EXPIRED"] as const satisfies readonly State[];
+
 /** Sous-ensemble que les adaptateurs peuvent remonter. */
 export type BlockingState = "QUEUE" | "CAPTCHA" | "LOGIN_REQUIRED" | "MANUAL_SELECTION" | "PURCHASE_LIMIT" | "BLOCKED";
 

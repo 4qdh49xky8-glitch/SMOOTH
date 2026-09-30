@@ -14,7 +14,9 @@
 - Le **statut est calculé** à chaque lancement à partir des preuves valides. On ne le saisit jamais à la main.
 - Une preuve vaut **180 jours** (jour 180 valide, jour 181 expiré), puis la plateforme repasse `EXPIRED`.
 
-## Statuts (autorisation explicite par canal)
+## Statuts (autorisation explicite par canal) — modèle FIGÉ
+
+La table ci-dessous est verrouillée par `AUTHORIZATION_MODEL` (objet gelé) et `tests/authModelFrozen.test.ts` : à ne changer que pour une raison majeure.
 
 **L'absence de preuve pour un canal signifie « non autorisé ».**
 

@@ -87,7 +87,7 @@ sans argument, et son `meta.id` est unique (`[a-z0-9-]+`). Les noms `SiteAdapter
 5. Implémenter le minimum (découverte, disponibilité, offres, prix, catégorie, quantité, sélection, panier) ; **jamais** de paiement.
 6. Déclarer les hôtes : pour l'API, `new ApiClient({ allowedHosts, baseUrl, … })` et exposer `client` (le cœur vérifie que ces hôtes sont
    dans `officialHosts`) ; pour le navigateur, `networkHosts()` si l'adaptateur contacte d'autres hôtes que la page d'événement.
-7. Fixtures locales (faux serveur / HTML) : sold-out, file, CAPTCHA, login, prix, quantité, sièges ensemble, panier incohérent,
+7. Fixtures locales — `defineBrowserAdapterSuite` / `defineApiAdapterSuite` ([FIXTURES.md](FIXTURES.md)), contrat dans [ADAPTER_CONTRACT.md](ADAPTER_CONTRACT.md) : sold-out, file, CAPTCHA, login, prix, quantité, sièges ensemble, panier incohérent,
    autorisation, hôtes. 8. `npm run test:adapters`, `npm test`, `npm run doctor`. 9. Seulement ensuite, éventuellement, un essai réel minimal
    — jamais sur une vente réelle sans vous — qui s'arrête à `CART_SUCCESS`.
 

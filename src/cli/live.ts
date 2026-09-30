@@ -8,7 +8,7 @@ import { installNetworkGuards } from "../browser/guards.js";
 import { traceSlowRequests, tuneNetwork } from "../browser/cdp.js";
 import { defaultUserDataDir, openBrowser, type BrowserSession } from "../browser/launch.js";
 import { loadConfig, resolveConfigPath } from "../config/load.js";
-import { allowedHosts, assertAuthorized, assertNetworkAllowed } from "../platforms/authorize.js";
+import { assertAuthorized, assertNetworkAllowed, platformHosts } from "../platforms/authorize.js";
 import { loadCatalog, type Catalog } from "../platforms/catalog.js";
 import { SelectorResolver } from "../selectors/resolver.js";
 import { assertCompliant } from "../sites/compliance.js";
@@ -77,7 +77,7 @@ export async function liveCommand(o: LiveOptions, deps: LiveDeps = {}): Promise<
   assertAuthorized(adapter.meta, catalog);
   assertCompliant(adapter.meta, adapter.resolveEventUrl(config));
   assertNetworkAllowed(adapter, config, catalog);
-  const hosts = allowedHosts(adapter.meta, catalog);
+  const hosts = platformHosts(adapter.meta, catalog);
 
   // Un seul bot par événement ET par profil de navigateur, pour TOUTE commande qui pilote une session (run, login, check) :
   // deux instances multiplieraient les sessions et les paniers (et partageraient un navigateur).

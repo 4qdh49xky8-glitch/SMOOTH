@@ -1,7 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { authorizeAdapter } from "../platforms/authorize.js";
+import type { BotConfig } from "../config/schema.js";
+import { authorizationOf, authorizeAdapter, channelOf, platformHosts, platformOf } from "../platforms/authorize.js";
 import type { Catalog } from "../platforms/catalog.js";
+import { hostMatches } from "../platforms/evidence.js";
+import { BaseSiteAdapter } from "./BaseSiteAdapter.js";
 import { assertCompliant } from "./compliance.js";
 import type { SiteAdapter } from "./SiteAdapter.js";
 
@@ -12,6 +15,9 @@ export interface ContractIssue {
 }
 
 const REQUIRED_METHODS = ["resolveEventUrl", "ensureLoggedIn", "prepare", "fetchSale", "selectOffer", "addToCart", "readCart", "detectBlocker"] as const;
+/** Les sept capacités du contrat (docs/ADAPTER_CONTRACT.md) et les déclarations explicites. */
+const CONTRACT_CAPABILITIES = ["getEvent", "getAvailability", "getOffers", "matchOffer", "selectOffer", "addToCart", "getCartState"] as const;
+const LOCAL_HOSTS = ["127.0.0.1", "localhost", "::1", "[::1]"];
 const CAPABILITY_KEYS = ["officialApi", "preciseServerTime", "lightweightAvailability", "reportsSeatAdjacency", "seatSelection"] as const;
 
 /**
@@ -56,6 +62,37 @@ export function checkAdapterContract(adapter: SiteAdapter, opts: { sourceFile?: 
   if (!meta.displayName) err("META_NAME", "meta.displayName manquant");
 
   for (const m of REQUIRED_METHODS) if (typeof adapter[m] !== "function") err("METHOD_MISSING", `méthode ${m}() manquante`);
+
+  // Contrat d'adaptateur : sept capacités + déclarations explicites (authorization, channel, capabilities, allowedHosts).
+  for (const m of CONTRACT_CAPABILITIES) if (typeof adapter[m] !== "function") err("CAPABILITY_MISSING", `capacité ${m}() manquante (contrat : ${CONTRACT_CAPABILITIES.join(", ")})`);
+  if (typeof adapter.allowedHosts !== "function") err("ALLOWED_HOSTS", "allowedHosts(config) manquant : l'adaptateur doit déclarer les hôtes qu'il contacte");
+  if (!adapter.authorization || adapter.authorization.platform !== platformOf(meta) || adapter.authorization.channel !== channelOf(meta)) err("AUTHORIZATION_DECL", "authorization incohérente avec meta (plateforme/canal) : utilisez authorizationOf(meta)");
+  else if (JSON.stringify(adapter.authorization) !== JSON.stringify(authorizationOf(meta))) err("AUTHORIZATION_DECL", "authorization ne correspond pas au modèle d'autorisation figé (statuts exigés) : utilisez authorizationOf(meta)");
+  if (adapter.channel !== channelOf(meta)) err("CHANNEL_DECL", "channel incohérent avec meta.channel / capabilities.officialApi");
+  if (adapter.capabilities !== meta.capabilities) err("CAPABILITIES_DECL", "capabilities doit être meta.capabilities");
+  if (adapter instanceof BaseSiteAdapter) {
+    const own = (n: string): boolean => (adapter as unknown as Record<string, unknown>)[n] !== (BaseSiteAdapter.prototype as unknown as Record<string, unknown>)[n];
+    if (!own("fetchSale") && !(own("getAvailability") && own("getOffers"))) err("CAPABILITY_UNIMPLEMENTED", "implémentez fetchSale() OU getAvailability() + getOffers()");
+    if (!own("readCart") && !own("getCartState")) err("CAPABILITY_UNIMPLEMENTED", "implémentez getCartState() OU readCart()");
+  }
+  // Fixture de développement : TEST_ONLY / NOT_A_REAL_PLATFORM ⇔ policy « demo » ; jamais d'hôte non local.
+  if (meta.compliance?.policy === "demo" && meta.testOnly !== true) err("TEST_ONLY_MARK", "un adaptateur « demo » doit porter meta.testOnly = true (TEST_ONLY, NOT_A_REAL_PLATFORM)");
+  if (meta.testOnly === true && meta.compliance?.policy !== "demo") err("TEST_ONLY_MARK", "meta.testOnly est réservé aux adaptateurs « demo »");
+  try {
+    const probe = { event: { url: meta.compliance?.policy === "demo" ? "http://127.0.0.1/e" : "https://example.com/e", name: "x" } } as unknown as BotConfig;
+    const hosts = typeof adapter.allowedHosts === "function" ? adapter.allowedHosts(probe) : [];
+    if (!Array.isArray(hosts) || hosts.some((h) => typeof h !== "string" || !/^[a-z0-9.[\]:-]+$/i.test(h))) err("ALLOWED_HOSTS", "allowedHosts() doit retourner des noms d'hôte (sans schéma ni chemin)");
+    else if (meta.testOnly === true && hosts.some((h) => !LOCAL_HOSTS.includes(h.toLowerCase()))) err("ALLOWED_HOSTS", "un adaptateur TEST_ONLY ne peut déclarer que des hôtes locaux");
+    else if ((adapter as { isApiAdapter?: boolean }).isApiAdapter === true) {
+      if (hosts.length === 0) warn("API_HOSTS", "aucun client API déclaré (allowedHosts vide) : cet adaptateur ne peut contacter aucune API tant que `client` (ApiClient avec allowedHosts) n'est pas défini");
+      if (opts.catalog && meta.compliance?.policy !== "demo") {
+        const official = platformHosts(meta, opts.catalog);
+        for (const h of hosts) if (!hostMatches(`https://${h}/`, official)) err("API_HOST_NOT_OFFICIAL", `l'hôte d'API « ${h} » n'est pas un domaine officiel de la plateforme (${official.join(", ") || "aucun"})`);
+      }
+    }
+  } catch (e) {
+    err("ALLOWED_HOSTS", `allowedHosts() a échoué : ${(e as Error).message}`);
+  }
 
   const caps = meta.capabilities as Record<string, unknown> | undefined;
   if (!caps) err("CAPS_MISSING", "meta.capabilities manquant");

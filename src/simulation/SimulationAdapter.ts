@@ -32,7 +32,7 @@ export class SimulationAdapter extends BaseSiteAdapter {
     this.meta = {
       id: "simulation",
       displayName: "Simulation (aucun contact réseau)",
-      compliance: { policy: "demo", termsUrl: "http://localhost/simulation", reviewedAt: "2026-01-01" },
+      testOnly: true, compliance: { policy: "demo", termsUrl: "http://localhost/simulation", reviewedAt: "2026-01-01" },
       capabilities: {
         officialApi: false,
         preciseServerTime: true,

@@ -78,6 +78,11 @@ export interface AdapterMeta {
   channel?: "official-api" | "browser";
   /** Prérequis d'exécution : un adaptateur dont les variables d'environnement manquent n'est pas retenu (le cœur passe au canal suivant). */
   requires?: { env?: string[] };
+  /**
+   * `true` : FIXTURE DE DÉVELOPPEMENT (TEST_ONLY, NOT_A_REAL_PLATFORM). Jamais une preuve d'architecture réelle ni une autorisation ;
+   * obligatoire (et réservé) à `compliance.policy: "demo"`, donc limité à localhost.
+   */
+  testOnly?: boolean;
   compliance: Compliance;
   capabilities: {
     /** Utilise une API officielle plutôt que le pilotage de pages. */
@@ -98,6 +103,30 @@ export interface AdapterMeta {
   };
 }
 
+/** Ce qu'un adaptateur EXIGE pour pouvoir s'exécuter (voir authorizationOf) : jamais une autorisation en soi. */
+export interface AdapterAuthorization {
+  platform: string;
+  channel: "official-api" | "browser";
+  policy: Compliance["policy"];
+  /** false : adaptateur de test (TEST_ONLY), limité à localhost. */
+  evidenceRequired: boolean;
+  /** Statuts de la plateforme qui autorisent ce canal (modèle figé). Vide pour un adaptateur de test. */
+  requiresStatus: string[];
+}
+
+/** Description de l'événement ciblé. */
+export interface EventInfo {
+  url: string;
+  name?: string;
+}
+
+/** Disponibilité de la vente à l'instant de la lecture. */
+export interface Availability {
+  open: boolean;
+  /** Le site indique explicitement « complet / épuisé ». */
+  soldOut: boolean;
+}
+
 export interface AdapterContext {
   config: BotConfig;
   context: BrowserContext;
@@ -108,59 +137,77 @@ export interface AdapterContext {
 }
 
 /**
- * Contrat à implémenter pour ajouter un site (le plus simple : étendre BaseSiteAdapter).
- * Règles :
- *  - `fetchSale` doit être LÉGER (API officielle ou requête HTTP), sans rendu de page ;
- *  - aucune méthode ne doit contourner CAPTCHA / file d'attente / anti-bot / limite d'achat /
- *    authentification : en cas de blocage, lever BlockerError (ou retourner un Blocker via
- *    detectBlocker) et le cœur passe la main ou s'arrête ;
- *  - aucune méthode ne doit déclencher un paiement.
+ * CONTRAT D'ADAPTATEUR (détail : docs/ADAPTER_CONTRACT.md). Le plus simple : étendre BaseSiteAdapter (navigateur) ou
+ * BaseApiAdapter (API officielle), qui fournissent tout ce qui n'est pas propre à la plateforme.
+ *
+ * DÉCLARATIONS (lecture seule ; elles disent ce que l'adaptateur EST et EXIGE, jamais ce qui est autorisé) :
+ *   authorization   plateforme + statuts qui autorisent son canal (la preuve seule peut les satisfaire)
+ *   channel         "official-api" | "browser"
+ *   capabilities    ce que la plateforme expose (API officielle, heure serveur, adjacence, choix de places, limite d'achat)
+ *   allowedHosts()  hôtes que l'adaptateur contactera ; TOUS doivent appartenir aux domaines officiels du catalogue
+ *
+ * CAPACITÉS (les sept seules dont le cœur a besoin) :
+ *   getEvent · getAvailability · getOffers · matchOffer · selectOffer · addToCart · getCartState
+ *
+ * ÉTATS : un adaptateur ne remonte que des états bloquants (QUEUE, CAPTCHA, LOGIN_REQUIRED, MANUAL_SELECTION, PURCHASE_LIMIT,
+ * BLOCKED) via `detectBlocker` ou `BlockerError` ; le cœur en déduit AVAILABLE, SOLD_OUT, CART_SUCCESS, ERROR.
+ *
+ * RÈGLES : lecture LÉGÈRE ; aucune méthode ne contourne CAPTCHA / file d'attente / anti-bot / limite de débit / limite d'achat /
+ * authentification (lever BlockerError ou signaler via detectBlocker : le cœur cède la main ou s'arrête) ; aucune méthode ne
+ * déclenche un paiement ; aucune requête hors de `allowedHosts()`.
  */
 export interface SiteAdapter {
-  /**
-   * Hôtes que cet adaptateur contactera en dehors de la page d'événement (API officielle, service de file…). Le cœur vérifie
-   * qu'ils appartiennent TOUS aux domaines officiels de la plateforme (catalogue) avant tout contact.
-   */
-  networkHosts?(config: BotConfig): string[];
   readonly meta: AdapterMeta;
+  readonly authorization: AdapterAuthorization;
+  readonly channel: "official-api" | "browser";
+  readonly capabilities: AdapterMeta["capabilities"];
+  /** Hôtes contactés (API officielle, page d'événement, service de file…), vérifiés contre les domaines officiels avant tout contact. */
+  allowedHosts(config: BotConfig): string[];
+
   /** URLs de paiement : bloquées pendant l'exécution du bot (garde-fou). */
   readonly paymentUrlPatterns: RegExp[];
 
-  /** Ouverture de la page événement : URL à charger. */
-  resolveEventUrl(config: BotConfig): string;
-
-  /** Heure serveur en epoch ms, si le site l'expose. */
-  getServerTime?(ctx: AdapterContext): Promise<number>;
-
-  /** Authentification MANUELLE par défaut : lève NotLoggedInError si l'humain doit se connecter. */
-  ensureLoggedIn(ctx: AdapterContext): Promise<void>;
-
-  /** Pré-chauffage avant l'ouverture : charge la page événement, ouvre les connexions. */
-  prepare(ctx: AdapterContext): Promise<void>;
-
-  /** Disponibilité + offres (prix, catégorie, quantité, adjacence). Peut lever RateLimitedError. */
-  fetchSale(ctx: AdapterContext): Promise<SaleSnapshot>;
-
+  // ───── les sept capacités ─────
+  /** L'événement visé (URL, nom). Local par défaut (depuis la configuration). */
+  getEvent(ctx: AdapterContext): Promise<EventInfo>;
+  /** La vente est-elle ouverte / complète ? Lecture légère. Peut lever RateLimitedError. */
+  getAvailability(ctx: AdapterContext): Promise<Availability>;
+  /** Offres normalisées : prix, catégorie, quantité, adjacence. Peut lever RateLimitedError. */
+  getOffers(ctx: AdapterContext): Promise<Offer[]>;
+  /**
+   * Veto propre à la plateforme (offre réservée, épuisée côté site…). Il ne peut QU'EXCLURE : le budget, la quantité, les catégories et
+   * la stratégie restent décidés par le cœur (déterministe) ; retourner `true` n'ajoute jamais une offre que le cœur a écartée.
+   */
+  matchOffer(offer: Offer, criteria: BotConfig["tickets"]): boolean;
   /** Ouvre l'offre et règle la quantité. Peut lever OfferUnavailableError / BlockerError. */
   selectOffer(ctx: AdapterContext, offer: Offer, quantity: number): Promise<void>;
+  /** Ajoute au panier (JAMAIS un paiement) et attend la confirmation (ou OfferUnavailableError). */
+  addToCart(ctx: AdapterContext): Promise<void>;
+  /** État du panier, relu depuis la plateforme (le cœur vérifie quantité et budget ; le bot s'arrête là). */
+  getCartState(ctx: AdapterContext): Promise<CartSummary>;
 
+  // ───── mécanique du cœur (fournie par les classes de base) ─────
+  /** Ouverture de la page événement : URL à charger (local, synchrone). */
+  resolveEventUrl(config: BotConfig): string;
+  /** Lecture atomique disponibilité + offres (dérivée de getAvailability + getOffers par défaut). */
+  fetchSale(ctx: AdapterContext): Promise<SaleSnapshot>;
+  /** Alias de getCartState, utilisé par le cœur. */
+  readCart(ctx: AdapterContext): Promise<CartSummary>;
+  /** Heure serveur en epoch ms, si le site l'expose. */
+  getServerTime?(ctx: AdapterContext): Promise<number>;
+  /** Authentification MANUELLE par défaut : lève NotLoggedInError si l'humain doit se connecter. */
+  ensureLoggedIn(ctx: AdapterContext): Promise<void>;
+  /** Pré-chauffage avant l'ouverture : charge la page événement, ouvre les connexions. */
+  prepare(ctx: AdapterContext): Promise<void>;
   /**
    * Optionnel — choix des places après selectOffer. Si le choix doit être fait par l'humain
    * (plan de salle), lever BlockerError({ state: "MANUAL_SELECTION", … }) : le cœur cède la main puis continue.
    */
   selectSeats?(ctx: AdapterContext, offer: Offer, quantity: number): Promise<void>;
-
-  /** Clique « Ajouter au panier » et attend la confirmation (ou OfferUnavailableError). */
-  addToCart(ctx: AdapterContext): Promise<void>;
-
-  readCart(ctx: AdapterContext): Promise<CartSummary>;
-
   /** Valide `siteOptions` de la config ; retourne des messages d'erreur (vide = OK). Utilisé par `npm run validate`. */
   validateOptions?(options: Record<string, unknown>): string[];
-
   /** Lecture seule de la page : file d'attente, CAPTCHA, anti-bot, limite d'achat, session expirée. */
   detectBlocker(ctx: AdapterContext): Promise<Blocker | null>;
-
   /**
    * Optionnel — lecture UNIQUE et cohérente « disponibilité + état bloquant » au même instant. Le cœur la préfère à
    * fetchSale + detectBlocker en parallèle quand ces deux lectures partagent un canal à cadence plafonnée (API officielle).

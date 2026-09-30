@@ -6,6 +6,7 @@ export class FakeAdapter extends BaseSiteAdapter {
   meta: AdapterMeta = {
     id: "fake",
     displayName: "Faux site",
+    testOnly: true,
     compliance: { policy: "demo", termsUrl: "http://localhost/", reviewedAt: "2026-01-01" },
     capabilities: { officialApi: false, preciseServerTime: true, lightweightAvailability: true, reportsSeatAdjacency: true, seatSelection: "none" },
   };

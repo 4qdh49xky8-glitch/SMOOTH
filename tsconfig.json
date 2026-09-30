@@ -12,5 +12,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["src", "demo", "scripts", "tests"]
+  "include": ["src", "demo", "testkit", "scripts", "tests"]
 }

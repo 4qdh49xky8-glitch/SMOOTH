@@ -21,6 +21,7 @@
     "profiles": "tsx src/index.ts profiles",
     "simulate": "tsx src/index.ts simulate",
     "stats": "tsx src/index.ts stats",
+    "test:fixtures": "node --import tsx --import ./tests/setup/noNetwork.ts --test tests/fixtureKit.test.ts tests/adapterContract.test.ts",
     "test:adapters": "node --import tsx --test tests/adapters.contract.test.ts",
     "new-site": "tsx scripts/new-site.ts",
     "test:stress": "node --import tsx --test tests/stress/*.test.ts",

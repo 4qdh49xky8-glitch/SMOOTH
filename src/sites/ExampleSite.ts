@@ -1,7 +1,7 @@
 import type { BotConfig } from "../config/schema.js";
 import { exampleSelectors as S } from "../selectors/example.js";
 import { seatsAreContiguous } from "../agent/matcher.js";
-import { NotLoggedInError, OfferUnavailableError, RateLimitedError } from "../utils/errors.js";
+import { BlockerError, NotLoggedInError, OfferUnavailableError, RateLimitedError } from "../utils/errors.js";
 import { BaseSiteAdapter } from "./BaseSiteAdapter.js";
 import type { AdapterContext, AdapterMeta, CartSummary, Offer, SaleSnapshot } from "./SiteAdapter.js";
 
@@ -18,9 +18,14 @@ interface ApiOffer {
 }
 
 /**
- * Adaptateur de référence, écrit pour le site de démonstration local (demo/server.ts).
- * Copiez ce fichier pour un vrai site : seules les méthodes ci-dessous changent.
+ * TEST_ONLY · NOT_A_REAL_PLATFORM
  *
+ * FIXTURE DE DÉVELOPPEMENT pour le site de démonstration local (demo/server.ts). Ce n'est PAS une plateforme réelle :
+ * il n'est ni une preuve d'architecture réelle, ni une autorisation, ni un modèle de plateforme vérifiée. Il est limité à
+ * localhost (policy « demo », meta.testOnly) et n'apparaît pas dans le catalogue des plateformes.
+ * Pour une vraie plateforme : preuve officielle d'abord (docs/ADDING_A_SITE.md), puis `npm run new-site`.
+ *
+ * Il illustre seulement la mécanique (lecture légère, deep link, attentes événementielles) :
  * Choix de latence illustrés ici :
  *  - fetchSale() utilise context.request (HTTP direct, cookies du navigateur partagés) : pas de rendu ;
  *  - selectOffer() navigue directement vers l'URL de l'offre (deep link), sans passer par la liste ;
@@ -29,7 +34,8 @@ interface ApiOffer {
 export default class ExampleSite extends BaseSiteAdapter {
   readonly meta: AdapterMeta = {
     id: "example",
-    displayName: "Site de démonstration local",
+    displayName: "Site de démonstration local (TEST_ONLY · NOT_A_REAL_PLATFORM)",
+    testOnly: true,
     compliance: {
       policy: "demo",
       termsUrl: "http://127.0.0.1/demo",
@@ -127,7 +133,12 @@ export default class ExampleSite extends BaseSiteAdapter {
     const ok = selectors.locator(page, S.cartItem).waitFor({ state: "visible" }).then(() => "ok" as const);
     const err = selectors.locator(page, S.addError).waitFor({ state: "visible" }).then(() => "error" as const);
     const outcome = await Promise.any([ok, err]).catch(() => "timeout" as const);
-    if (outcome === "error") throw new OfferUnavailableError("Ces billets ne sont plus disponibles");
+    if (outcome === "error") {
+      // Un message d'erreur n'est pas toujours « vendu » : une LIMITE D'ACHAT atteinte arrête le run (jamais contournée, jamais retentée sur une autre offre).
+      const blocker = await this.detectBlocker(ctx);
+      if (blocker?.state === "PURCHASE_LIMIT") throw new BlockerError(blocker);
+      throw new OfferUnavailableError("Ces billets ne sont plus disponibles");
+    }
     if (outcome === "timeout") throw new Error("Ni confirmation ni erreur après l'ajout au panier");
   }
 

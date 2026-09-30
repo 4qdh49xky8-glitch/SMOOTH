@@ -128,6 +128,9 @@ export default class ${P} extends BaseApiAdapter {
     },
   };
 
+  // Client HTTP encadré : les hôtes déclarés DOIVENT être des domaines officiels de la plateforme (vérifiés par le cœur et le contrat).
+  // readonly client = new ApiClient({ allowedHosts: ["api.exemple-officiel.fr"], baseUrl: "https://api.exemple-officiel.fr/v1", auth: { envVar: "${ENV}" } });
+
   /** Authentification OFFICIELLE : secret lu dans l'environnement. Jamais de formulaire, jamais de création de compte. */
   async authenticate(_ctx: AdapterContext): Promise<void> {
     throw new Error("TODO: authenticate");
@@ -150,7 +153,7 @@ export default class ${P} extends BaseApiAdapter {
 `
     : `import { BaseSiteAdapter } from "./BaseSiteAdapter.js";
 import { ${c}Selectors as S } from "../selectors/${id}.js";
-import type { AdapterContext, AdapterMeta, CartSummary, Offer, SaleSnapshot } from "./SiteAdapter.js";
+import type { AdapterContext, AdapterMeta, Availability, CartSummary, Offer } from "./SiteAdapter.js";
 
 ${header}
 export default class ${P} extends BaseSiteAdapter {
@@ -173,10 +176,15 @@ export default class ${P} extends BaseSiteAdapter {
   protected async isLoggedIn(_ctx: AdapterContext): Promise<boolean> {
     throw new Error("TODO: isLoggedIn");
   }
+  /** Contrat (docs/ADAPTER_CONTRACT.md) : sept capacités. Ici : getAvailability + getOffers (ou une seule lecture fetchSale). */
   /** Léger et sans rendu si possible. Lever RateLimitedError sur 429. Ne jamais contourner une file/un CAPTCHA. */
-  async fetchSale(_ctx: AdapterContext): Promise<SaleSnapshot> {
-    throw new Error("TODO: fetchSale");
+  override async getAvailability(_ctx: AdapterContext): Promise<Availability> {
+    throw new Error("TODO: getAvailability");
   }
+  override async getOffers(_ctx: AdapterContext): Promise<Offer[]> {
+    throw new Error("TODO: getOffers");
+  }
+  // override allowedHosts(config) : ajoutez ici les hôtes contactés en plus de la page d'événement (ils doivent être officiels).
   async selectOffer(_ctx: AdapterContext, _offer: Offer, _quantity: number): Promise<void> {
     void S;
     throw new Error("TODO: selectOffer");
@@ -185,8 +193,8 @@ export default class ${P} extends BaseSiteAdapter {
   async addToCart(_ctx: AdapterContext): Promise<void> {
     throw new Error("TODO: addToCart");
   }
-  async readCart(_ctx: AdapterContext): Promise<CartSummary> {
-    throw new Error("TODO: readCart");
+  override async getCartState(_ctx: AdapterContext): Promise<CartSummary> {
+    throw new Error("TODO: getCartState");
   }
 }
 `;
