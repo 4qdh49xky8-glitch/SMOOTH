@@ -21,6 +21,22 @@ const matchesAny = (value: string | undefined, patterns: string[]): boolean => {
 };
 
 /**
+ * Rangée ∈ liste ? Étiquette exacte (insensible à la casse et aux accents : « A », « 12 ») ou intervalle numérique (« 1-5 »).
+ * Égalité exacte, pas une sous-chaîne : « 1 » ne correspond pas à « 10 ».
+ */
+export const rowMatches = (row: string | undefined, patterns: string[]): boolean => {
+  if (!row || patterns.length === 0) return false;
+  const r = normalize(row);
+  const n = /^\d+$/.test(r) ? Number(r) : undefined;
+  return patterns.some((p) => {
+    const q = normalize(p);
+    const range = /^(\d+)\s*-\s*(\d+)$/.exec(q);
+    if (range && n !== undefined) return n >= Number(range[1]) && n <= Number(range[2]);
+    return q === r;
+  });
+};
+
+/**
  * Clés de tri par critère (plus petit = meilleur), comparées lexicographiquement.
  * 100 % déterministe (aucun appel LLM).
  */
@@ -43,7 +59,8 @@ function criterionKey(c: Criterion, o: Offer, t: TicketCriteria, s: Strategy): n
       const section = matchesAny(o.section, p.preferSections) ? 0 : matchesAny(o.section, p.avoidSections) ? 2 : 1;
       const rowNum = Number.parseInt(o.row ?? "", 10);
       const row = p.rowPreference === "any" || Number.isNaN(rowNum) ? Number.MAX_SAFE_INTEGER : p.rowPreference === "front" ? rowNum : -rowNum;
-      return [section, row];
+      const rowList = rowMatches(o.row, p.preferRows) ? 0 : rowMatches(o.row, p.avoidRows) ? 2 : 1;
+      return [section, rowList, row];
     }
     case "price":
       return [s.priceOrder === "cheapest" ? cents(o.pricePerTicket) : -cents(o.pricePerTicket)];

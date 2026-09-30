@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { doctorCommand } from "./cli/doctor.js";
 import { liveCommand, type LiveDeps } from "./cli/live.js";
+import { saleCheckCommand, saleWaitCommand } from "./cli/sale.js";
 import { simulateCommand } from "./cli/simulate.js";
 import { sitesCommand } from "./cli/sites.js";
 import { platformCommand } from "./cli/platform.js";
@@ -22,6 +23,9 @@ Adaptateurs et configuration
   profiles                       Liste les profils disponibles
   doctor                         Diagnostic local : Node, Chromium, config, adaptateurs, preuves, expiration, environnement, permissions  (npm run doctor)
   platform <verify|template|check|add|history>   Preuves officielles : ce qui manque, modèle, validation, dépôt, historique   (npm run platform verify)
+  sale check                     READY / NOT_READY d'une vente, sans contacter la plateforme           (npm run sale:check -- --config sale.yaml)
+  sale wait                      Mode attente : contrôle, attente locale, remise au lancement → panier (npm run sale:wait -- --config sale.yaml)
+                                 --human : rappels seulement, aucun automatisme
   platforms                      Tableau interne des plateformes candidates (preuves officielles, verdicts)  (npm run platforms)
                                  --check : cohérence du catalogue · --hosts : domaines officiels à autoriser · --json
 
@@ -56,6 +60,8 @@ export async function main(argv: string[] = process.argv.slice(2), deps: LiveDep
       hosts: { type: "boolean", default: false },
       markdown: { type: "boolean", default: false },
       topic: { type: "string" },
+      human: { type: "boolean", default: false },
+      "recheck-seconds": { type: "string" },
     },
   });
   const [command, arg] = positionals;
@@ -72,6 +78,14 @@ export async function main(argv: string[] = process.argv.slice(2), deps: LiveDep
       return platformCommand({ sub: arg, target: positionals[2], topic: values.topic, json: values.json });
     case "platforms":
       return platformsCommand({ json: values.json, check: values.check, hosts: values.hosts, markdown: values.markdown });
+    case "sale": {
+      const common = { target: values.config ?? values.profile ?? positionals[2], json: values.json, human: values.human };
+      if (arg === "check") return saleCheckCommand(common);
+      if (arg === "wait")
+        return saleWaitCommand({ ...common, logLevel: values["log-level"], logFile: values["log-file"], exitWhenDone: values["exit-when-done"], trace: values.trace, recheckSeconds: values["recheck-seconds"] ? Number(values["recheck-seconds"]) : undefined }, { live: deps });
+      console.log("Usage : sale check|wait [--config <fichier>] [--human] [--json]");
+      return 1;
+    }
     case "profiles": {
       const names = listProfiles();
       for (const n of names) {

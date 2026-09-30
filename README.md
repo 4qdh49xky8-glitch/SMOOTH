@@ -24,6 +24,8 @@ et laisse le navigateur ouvert pour que vous vérifiiez et payiez vous-même.
 | Commande | Rôle |
 |----------|------|
 | `npm run sites` | liste les adaptateurs, leur base d'autorisation et l'état de leur contrat |
+| `npm run sale:check -- --config config/sale.yaml` | **READY / NOT_READY** d'une vente (profil générique YAML/JSON), sans contacter la plateforme |
+| `npm run sale:wait -- --config config/sale.yaml` | mode attente : contrôle, attente locale (réévaluée), lancement, panier, arrêt à `CART_SUCCESS` (`--human` : rappels seulement) |
 | `npm run test:fixtures` | kit de fixtures + contrat d'adaptateur : scénarios locaux (TEST_ONLY · NOT_A_REAL_PLATFORM) |
 | `npm run test:adapters` | vérifie automatiquement que **chaque** adaptateur respecte le contrat (`ADAPTER=<id>` pour un seul) |
 | `npm run validate -- config/event.json` | valide une configuration **sans contacter aucun site** (`-- concert` pour un profil, `-- --all` pour tous) |
@@ -93,6 +95,7 @@ Détail : [docs/SECURITY.md](docs/SECURITY.md).
 
 | Document | Contenu |
 |----------|---------|
+| [docs/SALE.md](docs/SALE.md) | **mode READY FOR SALE** : profil de vente générique, stratégies, rangées, fuseaux, `sale:check`, `sale:wait` |
 | [docs/ADAPTER_CONTRACT.md](docs/ADAPTER_CONTRACT.md) | **contrat d'adaptateur** : déclarations (authorization, allowedHosts, channel, capabilities), sept capacités, états, ApiClient, interdits |
 | [docs/FIXTURES.md](docs/FIXTURES.md) | **fixtures locales** pour tester un futur adaptateur : scénarios, faux site, suites de conformité (TEST_ONLY) |
 | [docs/SECURITY.md](docs/SECURITY.md) | **modèle d'autorisation par canal, preuves, verrous, reprise, réseau, secrets, Claude, limites** |

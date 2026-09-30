@@ -7,7 +7,7 @@ import { discoverAdapters } from "../sites/registry.js";
 import type { SiteAdapter } from "../sites/SiteAdapter.js";
 import { basename } from "node:path";
 import { ConfigSchema, type BotConfig } from "./schema.js";
-import { readConfigFile, resolveConfigPath } from "./load.js";
+import { profileName, readConfigFile, resolveConfigPath } from "./load.js";
 
 export interface ValidationReport {
   file: string;
@@ -33,13 +33,13 @@ export interface ValidateOptions {
 export async function validateConfig(target: string, opts: ValidateOptions = {}): Promise<ValidationReport> {
   const now = opts.now ?? Date.now();
   const env = opts.env ?? process.env;
-  const report: ValidationReport = { file: target, profile: basename(target, ".json"), ok: false, errors: [], warnings: [], info: [] };
+  const report: ValidationReport = { file: target, profile: profileName(target), ok: false, errors: [], warnings: [], info: [] };
   const { errors, warnings, info } = report;
 
   let raw: unknown;
   try {
     report.file = resolveConfigPath(target);
-    report.profile = basename(report.file, ".json");
+    report.profile = profileName(report.file);
     raw = readConfigFile(report.file);
   } catch (e) {
     errors.push((e as Error).message);
@@ -120,8 +120,10 @@ export async function validateConfig(target: string, opts: ValidateOptions = {})
   const p = cfg.strategy.placement;
   const overlap = p.preferSections.filter((s) => p.avoidSections.map(normalize).includes(normalize(s)));
   if (overlap.length) warnings.push(`strategy.placement : sections à la fois préférées et évitées : ${overlap.join(", ")}.`);
+  const rowOverlap = p.preferRows.filter((r) => p.avoidRows.map(normalize).includes(normalize(r)));
+  if (rowOverlap.length) warnings.push(`strategy.placement : rangées à la fois préférées et évitées : ${rowOverlap.join(", ")}.`);
   if (cfg.strategy.priority.includes("seatsTogether") && !cfg.tickets.seatsTogether) info.push("critère seatsTogether ignoré (tickets.seatsTogether=false).");
-  if (cfg.strategy.priority.includes("placement") && !p.preferSections.length && !p.avoidSections.length && p.rowPreference === "any")
+  if (cfg.strategy.priority.includes("placement") && !p.preferSections.length && !p.avoidSections.length && !p.preferRows.length && !p.avoidRows.length && p.rowPreference === "any")
     info.push("critère placement sans effet (aucune préférence de section ni de rang).");
   info.push(
     `sélection : max ${cfg.tickets.maxPricePerTicket} €/billet × ${cfg.tickets.quantity} = ${cfg.tickets.maxPricePerTicket * cfg.tickets.quantity} € ; ` +

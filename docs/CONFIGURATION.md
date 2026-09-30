@@ -1,5 +1,7 @@
 # Configuration, profils et stratégie de sélection
 
+> **Profil de vente générique** (YAML/JSON : `event`, `sale` + `timezone`, `tickets`, `budget`, `selection`, `behavior`) : voir [SALE.md](SALE.md) — traduit en cette configuration standard ; toutes les commandes l'acceptent (`--config sale.yaml`).
+
 ## Profils
 
 Un profil = un fichier JSON dans `config/events/`. Vous en gardez autant que d'événements :
@@ -38,6 +40,7 @@ Sans option, `npm start` lit `config/event.json`. Un ancien fichier plat (V1 : `
 | `siteOptions` | `{}` | réglages libres propres à l'adaptateur (validés par `validateOptions`) |
 | `event.name` | requis | nom de l'événement |
 | `event.date` | — | date de l'événement `AAAA-MM-JJ` (contrôle de cohérence) |
+| `event.id`, `event.venue` | — | identifiant chez la plateforme et lieu (informatifs ; l'id est transmis à l'adaptateur) |
 | `event.url` | — | page de l'événement (requise sauf si l'adaptateur a une URL par défaut) |
 | `sale.startTime` | requis | ouverture de la vente, ISO 8601 **avec fuseau** (`2026-10-01T10:00:00+02:00`) |
 | `tickets.quantity` | requis | nombre de billets (1–10) |
@@ -45,6 +48,7 @@ Sans option, `npm start` lit `config/event.json`. Un ancien fichier plat (V1 : `
 | `tickets.categories` | `[]` | catégories acceptées, **l'ordre = préférence** ; `[]` = toutes |
 | `tickets.seatsTogether` | `true` | préférer les places côte à côte |
 | `tickets.seatsTogetherStrict` | `false` | refuser toute offre dont la contiguïté n'est pas **confirmée** |
+| `strategy.placement.preferRows` / `avoidRows` | `[]` | rangées préférées / à éviter : étiquettes exactes (`A`, `12`) ou intervalles (`1-5`) |
 | `strategy.*` | voir ci-dessous | classement des offres retenues |
 | `behavior.autoAddToCart` | `true` | `false` : sélectionne l'offre puis vous laisse ajouter au panier |
 | `behavior.autoPayment` | `false` | **doit rester `false`** : `true` est refusé par la validation |

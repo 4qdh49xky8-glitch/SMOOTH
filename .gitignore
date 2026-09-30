@@ -7,3 +7,7 @@ runs
 *.log
 config/event.json
 .locks
+
+config/sale.yaml
+config/sale.yml
+config/sale.json

@@ -14,6 +14,7 @@ const COMMANDS: string[][] = [
   ["doctor"], ["doctor", "--json"], ["platforms"], ["platforms", "--json"], ["platforms", "--check"], ["platforms", "--hosts"], ["platforms", "--markdown"],
   ["platform", "verify"], ["platform", "verify", "eventim"], ["platform", "history", "eventim"], ["platform", "template", "eventim"], ["platform", "check"],
   ["validate", "--all"], ["validate", "concert"], ["sites"], ["profiles"], ["stats"], ["simulate", "--scenario", "nominal"], ["simulate", "--scenario", "captcha"],
+  ["sale", "check", "--config", "config/sale.example.yaml"], ["sale", "check", "--config", "config/sale.example.yaml", "--json"], ["sale", "check", "--config", "config/sale.example.yaml", "--human"],
   ["help"],
 ];
 const audit = (args: string[], env: NodeJS.ProcessEnv = {}) =>
@@ -27,7 +28,7 @@ for (const args of COMMANDS) {
     const m = /NET_AUDIT external=(\d+) loopback=(\d+) fetch=(\d+)/.exec(r.stderr);
     assert.ok(m, `compteur absent :\n${r.stderr}`);
     assert.deepEqual([m[1], m[2], m[3]], ["0", "0", "0"], r.stderr);
-    assert.ok(r.status === 0 || args[0] === "help" || args[0] === "doctor", `code de sortie ${r.status}\n${r.stdout}\n${r.stderr}`);
+    assert.ok(r.status === 0 || args[0] === "help" || args[0] === "doctor" || args[0] === "sale", `code de sortie ${r.status}\n${r.stdout}\n${r.stderr}`);
     assert.ok(!/ECONNREFUSED|ENOTFOUND|EAI_AGAIN|Tentative de connexion réseau externe/.test(r.stdout + r.stderr));
   });
 }

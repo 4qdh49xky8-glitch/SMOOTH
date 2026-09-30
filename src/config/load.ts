@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, dirname, extname, join, resolve } from "node:path";
+import { convertSaleProfile, isSaleProfile, readStructuredFile } from "../sale/profile.js";
 import { ConfigSchema, type BotConfig } from "./schema.js";
 
 export const PROFILES_DIR = "config/events";
@@ -30,9 +31,12 @@ export function deepMerge(base: unknown, over: unknown): unknown {
   return out;
 }
 
+/** Nom de profil : nom de fichier sans extension (.json, .yaml, .yml). */
+export const profileName = (path: string): string => basename(path).replace(/\.(json|ya?ml)$/i, "");
+
 function readJson(abs: string): unknown {
   try {
-    return JSON.parse(readFileSync(abs, "utf8"));
+    return readStructuredFile(abs);
   } catch (err) {
     throw new Error(`Impossible de lire la configuration ${abs} : ${(err as Error).message}`);
   }
@@ -42,7 +46,13 @@ function readJson(abs: string): unknown {
 export function readConfigFile(path: string, depth = 0): unknown {
   if (depth > 5) throw new Error(`Chaîne "extends" trop profonde ou circulaire (${path})`);
   const abs = resolve(path);
-  const raw = migrateLegacyConfig(readJson(abs));
+  let raw = migrateLegacyConfig(readJson(abs));
+  // Profil de vente générique (event.platform, budget, selection…) → configuration standard ; le cœur ne voit que celle-ci.
+  if (isSaleProfile(raw)) {
+    const converted = convertSaleProfile(raw);
+    if (!converted.config) throw new Error(`Profil de vente invalide (${abs}) :\n${converted.issues.map((i) => `  - ${i}`).join("\n")}`);
+    raw = converted.config;
+  }
   if (isObj(raw) && typeof raw.extends === "string") {
     const parent = readConfigFile(join(dirname(abs), raw.extends), depth + 1);
     return deepMerge(parent, raw);
@@ -53,7 +63,7 @@ export function readConfigFile(path: string, depth = 0): unknown {
 /** Accepte un chemin de fichier ou un nom de profil (config/events/<nom>.json). */
 export function resolveConfigPath(target: string | undefined, profilesDir = PROFILES_DIR): string {
   if (!target) return "config/event.json";
-  if (/[\\/]/.test(target) || extname(target) === ".json") return target;
+  if (/[\\/]/.test(target) || [".json", ".yaml", ".yml"].includes(extname(target).toLowerCase())) return target;
   const p = join(profilesDir, `${target}.json`);
   if (existsSync(p)) return p;
   throw new Error(`Profil inconnu « ${target} » (attendu : ${p}). Profils disponibles : ${listProfiles(profilesDir).join(", ") || "(aucun)"}`);
@@ -64,7 +74,7 @@ export function listProfiles(profilesDir = PROFILES_DIR): string[] {
   try {
     return readdirSync(profilesDir)
       .filter((f) => f.endsWith(".json") && !f.startsWith("_"))
-      .map((f) => basename(f, ".json"))
+      .map((f) => profileName(f))
       .sort();
   } catch {
     return [];

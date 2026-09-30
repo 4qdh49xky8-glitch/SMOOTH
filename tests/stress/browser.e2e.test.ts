@@ -164,6 +164,48 @@ t("18 · de bout en bout (vrai navigateur) : panier obtenu, puis arrêt — la p
   }
 });
 
+t("READY FOR SALE (profil générique YAML) : sale:check puis sale:wait de bout en bout — attente, sélection déterministe, panier, arrêt ; paiement jamais demandé", async () => {
+  const open = Math.ceil((Date.now() + 6000) / 1000) * 1000;
+  const d = await startDemoServer({ openAt: open, contention: true });
+  const { stringify } = await import("yaml");
+  const file = join(tmp, "sale-e2e.yaml");
+  writeFileSync(file, stringify({
+    event: { platform: "example", eventUrl: `${d.url}/event`, eventId: "", name: "Événement générique (fixture)", venue: "", date: "" },
+    sale: { startTime: new Date(open).toISOString(), timezone: "UTC" },
+    tickets: { quantity: 2, seatsTogether: true, strictTogether: false },
+    budget: { maxPrice: 150 },
+    selection: { strategy: "priority", categories: ["Catégorie 1", "Catégorie 2", "Catégorie 3"], preferredSections: [], avoidedSections: [], preferredRows: [], avoidedRows: [] },
+    behavior: { autoAddToCart: true, autoPayment: false },
+    advanced: { timing: { preArmSeconds: 3 }, browser: { headless: true, userDataDir: join(tmp, "profil-sale"), executablePath: process.env.CHROMIUM_PATH }, telemetry: { dir: join(tmp, "runs-sale") }, notifications: { desktop: false, sound: false } },
+  }));
+  const prev = { e: process.env.EXAMPLE_EMAIL, p: process.env.EXAMPLE_PASSWORD };
+  process.env.EXAMPLE_EMAIL = "demo@example.com";
+  process.env.EXAMPLE_PASSWORD = "demo";
+  const lines: string[] = [];
+  const log = console.log;
+  console.log = (m?: unknown) => void lines.push(String(m));
+  try {
+    assert.equal(await main(["sale", "check", "--config", file]), 0, lines.join("\n"));
+    assert.match(lines.join("\n"), /READY — canal browser, statut TEST_ONLY/);
+    assert.equal(d.state.requests.length, 0, "sale:check n'a contacté AUCUN serveur");
+    lines.length = 0;
+    const code = await main(["sale", "wait", "--config", file, "--exit-when-done", "--log-level", "error"]);
+    assert.equal(code, 0, lines.join("\n"));
+    assert.match(lines.join("\n"), /CART_SUCCESS — panier obtenu[\s\S]*FINALISEZ LE PAIEMENT VOUS-MÊME/);
+    assert.equal(d.state.cart.length, 1);
+    assert.equal(d.state.cart[0]!.offerId, "o6", "sélection déterministe : repli après contention sur la meilleure offre suivante, côte à côte, dans le budget");
+    assert.equal(d.state.paymentHits, 0, "AUCUNE requête de paiement");
+    await sleep(300);
+    assert.equal(d.state.addAttempts, 2, "arrêt immédiat après le panier");
+  } finally {
+    console.log = log;
+    process.env.EXAMPLE_EMAIL = prev.e;
+    process.env.EXAMPLE_PASSWORD = prev.p;
+    rmSync(join(".profile", "sale-e2e"), { recursive: true, force: true });
+    await d.close();
+  }
+});
+
 const HOSTILE_PAGE = `<html><head><title>Panier de Jean Dupont — jean.dupont@example.com</title></head><body>
 <header><a href="/compte?sid=SESSION-9f8e7d6c5b4a" data-testid="account">Bonjour Jean Dupont</a><a href="/logout">Déconnexion</a></header>
 <nav><a href="/aide">Aide jean.dupont@example.com</a></nav>

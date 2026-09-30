@@ -7,7 +7,7 @@ import { createApiContext } from "../api/BaseApiAdapter.js";
 import { installNetworkGuards } from "../browser/guards.js";
 import { traceSlowRequests, tuneNetwork } from "../browser/cdp.js";
 import { defaultUserDataDir, openBrowser, type BrowserSession } from "../browser/launch.js";
-import { loadConfig, resolveConfigPath } from "../config/load.js";
+import { loadConfig, profileName, resolveConfigPath } from "../config/load.js";
 import { assertAuthorized, assertNetworkAllowed, platformHosts } from "../platforms/authorize.js";
 import { loadCatalog, type Catalog } from "../platforms/catalog.js";
 import { SelectorResolver } from "../selectors/resolver.js";
@@ -27,6 +27,8 @@ export interface LiveOptions {
   exitWhenDone: boolean;
   logLevel?: string;
   logFile?: string;
+  /** Mode humain explicite (sale:wait --human) : ne fait que restreindre le canal, jamais l'élargir. */
+  forceHuman?: boolean;
 }
 
 /** Dépendances remplaçables (tests) : adaptateurs et catalogue. Par défaut : src/sites/ et platforms/. */
@@ -38,9 +40,10 @@ export interface LiveDeps {
 /** Commandes qui pilotent une session : run, login, check. */
 export async function liveCommand(o: LiveOptions, deps: LiveDeps = {}): Promise<number> {
   const target = o.target ?? "config/event.json";
-  const config = loadConfig(target);
+  const loaded = loadConfig(target);
+  const config = o.forceHuman ? { ...loaded, channel: "human" as const } : loaded;
   // Identité de l'instance : nom du profil + PID. Elle préfixe les logs et nomme le navigateur (un profil = un navigateur).
-  const profile = basename(resolveConfigPath(target), ".json");
+  const profile = profileName(resolveConfigPath(target));
   const instance = `${profile}#${process.pid}`;
   const logFile = (o.logFile ?? config.logging.file)?.replaceAll("{profile}", profile).replaceAll("{pid}", String(process.pid));
   const log = createLogger({ level: pickLevel(o.logLevel, process.env.LOG_LEVEL, config.logging.level), file: logFile, scope: instance });

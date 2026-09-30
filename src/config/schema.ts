@@ -45,6 +45,9 @@ export const StrategySchema = z.object({
       /** Offres exclues d'office si leur section correspond. */
       excludeSections: z.array(z.string().min(1)).default([]),
       rowPreference: z.enum(["front", "back", "any"]).default("any"),
+      /** Rangées préférées / à éviter : étiquettes exactes (« A », « 12 ») ou intervalles numériques (« 1-5 »). Les préférées passent avant, les évitées après. */
+      preferRows: z.array(z.string().min(1)).default([]),
+      avoidRows: z.array(z.string().min(1)).default([]),
     })
     .default({}),
 });
@@ -68,6 +71,10 @@ export const ConfigSchema = z.object({
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format AAAA-MM-JJ").optional(),
     /** URL de la page de l'événement (sinon celle par défaut de l'adaptateur). */
     url: z.string().url().optional(),
+    /** Identifiant de l'événement chez la plateforme (informatif, transmis à l'adaptateur). */
+    id: z.string().min(1).optional(),
+    /** Lieu (informatif). */
+    venue: z.string().min(1).optional(),
   }),
   sale: z.object({
     /** Heure officielle d'ouverture, ISO 8601 AVEC fuseau (ex. 2026-10-01T10:00:00+02:00). */

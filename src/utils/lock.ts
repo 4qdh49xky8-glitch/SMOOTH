@@ -116,3 +116,37 @@ export function acquireEventLock(key: string, instance: string, dir = ".locks", 
   }
   throw new Error("Impossible d'acquérir le verrou d'événement.");
 }
+
+export interface LockInspection {
+  state: "free" | "held" | "stale";
+  /** Détenteur (si verrou présent). */
+  owner?: { instance: string; pid: number; startedAt: string };
+}
+
+/**
+ * Lecture SEULE d'un verrou (aucune création, aucune suppression) : libre, détenu par un processus vivant, ou périmé (processus mort,
+ * PID réutilisé, plus de 24 h, fichier illisible). Sert à `sale:check` : savoir si `run` serait refusé, sans rien réserver.
+ */
+export function inspectLock(key: string, dir = ".locks", now = Date.now()): LockInspection {
+  const file = join(dir, `${key}.lock`);
+  let text: string;
+  try {
+    text = readFileSync(file, "utf8");
+  } catch {
+    return { state: "free" };
+  }
+  let info: LockInfo | null = null;
+  try {
+    const parsed = JSON.parse(text) as LockInfo;
+    if (parsed && typeof parsed.pid === "number" && typeof parsed.instance === "string" && typeof parsed.startedAt === "string") info = parsed;
+  } catch {
+    /* illisible : périmé */
+  }
+  if (!info) return { state: "stale" };
+  const owner = { instance: info.instance, pid: info.pid, startedAt: info.startedAt };
+  const reused = !!info.procStart && processStart(info.pid) !== undefined && processStart(info.pid) !== info.procStart;
+  const old = now - Date.parse(info.startedAt) > LOCK_MAX_AGE_MS;
+  if (held.has(file)) return { state: "held", owner };
+  if (!old && !reused && info.pid !== process.pid && alive(info.pid)) return { state: "held", owner };
+  return { state: "stale", owner };
+}

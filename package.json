@@ -27,12 +27,15 @@
     "test:stress": "node --import tsx --test tests/stress/*.test.ts",
     "platforms": "tsx src/index.ts platforms",
     "platform": "tsx src/index.ts platform",
-    "doctor": "tsx src/index.ts doctor"
+    "doctor": "tsx src/index.ts doctor",
+    "sale:check": "tsx src/index.ts sale check",
+    "sale:wait": "tsx src/index.ts sale wait"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",
     "dotenv": "^16.4.5",
     "playwright": "1.56.1",
+    "yaml": "^2.9.1",
     "zod": "^3.23.8"
   },
   "devDependencies": {

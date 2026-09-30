@@ -1,0 +1,43 @@
+# Profil de vente GÉNÉRIQUE — valable pour tout événement (concert, festival, sport, spectacle…) et toute plateforme.
+# Copiez ce fichier (config/sale.yaml, ignoré par git), renseignez-le, puis :
+#   npm run sale:check -- --config config/sale.yaml     # READY / NOT_READY, sans contacter la plateforme
+#   npm run sale:wait  -- --config config/sale.yaml     # attend l'ouverture, met au panier, S'ARRÊTE (paiement manuel)
+#
+# Cet exemple vise le site de démonstration local « example » (TEST_ONLY · NOT_A_REAL_PLATFORM, limité à localhost).
+# Une vraie plateforme n'est lançable que si des preuves officielles valides l'autorisent (docs/PLATFORMS.md) ; sinon : NOT_READY.
+
+event:
+  platform: example              # identifiant de la plateforme (catalogue / adaptateur)
+  eventUrl: "http://127.0.0.1:4173/event"
+  eventId: ""                    # identifiant chez la plateforme (facultatif)
+  name: "Événement de démonstration"
+  venue: ""                      # facultatif
+  date: ""                       # AAAA-MM-JJ, facultatif
+
+sale:
+  startTime: "2026-12-01T10:00:00"   # heure LOCALE + timezone, ou ISO avec décalage (2026-12-01T10:00:00+01:00)
+  timezone: "Europe/Paris"           # fuseau IANA (l'heure d'été est calculée ; une heure inexistante/ambiguë est refusée)
+
+tickets:
+  quantity: 2
+  seatsTogether: true            # préférer les places côte à côte
+  strictTogether: false          # true : refuser toute offre dont la contiguïté n'est pas CONFIRMÉE
+
+budget:
+  maxPrice: 150                  # prix MAXIMUM par billet (contrainte dure). null = refusé : pas de budget illimité.
+
+selection:
+  strategy: "priority"           # priority | cheapest | best-seats | category-first | fewest-orphans | custom
+  categories: []                 # acceptées, l'ordre = préférence ; [] = toutes
+  preferredSections: []
+  avoidedSections: []
+  preferredRows: []              # étiquettes exactes ("A", "12") ou intervalles numériques ("1-5")
+  avoidedRows: []
+
+behavior:
+  autoAddToCart: true
+  autoPayment: false             # doit rester false : le paiement est toujours manuel
+
+# channel: auto                  # facultatif : auto | official-api | browser | human — ne peut QUE restreindre les permissions
+# advanced:                      # facultatif : timing, browser, cart, claude, notifications, telemetry, logging, siteOptions
+#   timing: { preArmSeconds: 90 }
