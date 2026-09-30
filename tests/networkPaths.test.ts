@@ -166,7 +166,7 @@ test("inventaire : CDP/fetch de launch.ts visent UNIQUEMENT la boucle locale ; C
 
 test("ordre des garde-fous dans le code : autorisation → hôtes → verrous → navigateur → garde réseau → première navigation", () => {
   const live = code.get("src/cli/live.ts")!;
-  const order = ["resolveChannel(", "assertAuthorized(adapter.meta", "assertNetworkAllowed(adapter", "acquireEventLock(eventKey", "await openBrowser(", "await installNetworkGuards(", ".goto("].map((m) => [m, live.indexOf(m)] as const);
+  const order = ["resolveChannel(", "assertAuthorized(adapter.meta", "assertNetworkAllowed(adapter", "acquireEventLock(k, instance)", "await openBrowser(", "await installNetworkGuards(", ".goto("].map((m) => [m, live.indexOf(m)] as const);
   for (const [m, i] of order) assert.ok(i >= 0, `absent de live.ts : ${m}`);
   assert.deepEqual([...order].sort((a, b) => a[1] - b[1]).map((o) => o[0]), order.map((o) => o[0]), "l'ordre des garde-fous a changé");
   const agent = code.get("src/agent/Agent.ts")!;

@@ -1,14 +1,14 @@
 import { normalize } from "../agent/matcher.js";
 import { resolveChannel, type ChannelDecision } from "../agent/channels.js";
-import { profileName, readConfigFile, resolveConfigPath } from "../config/load.js";
+import { profileName, resolveConfigPath } from "../config/load.js";
 import type { BotConfig } from "../config/schema.js";
 import { validateConfig } from "../config/validate.js";
 import { assertNetworkAllowed } from "../platforms/authorize.js";
 import { loadCatalog, stateOf, type Catalog, type PlatformStatus } from "../platforms/catalog.js";
-import { defaultUserDataDir } from "../browser/launch.js";
 import { discoverAdapters } from "../sites/registry.js";
 import type { SiteAdapter } from "../sites/SiteAdapter.js";
-import { eventKey, inspectLock, profileKey } from "../utils/lock.js";
+import { inspectLock, type EventLock } from "../utils/lock.js";
+import { lockKeysFor, type LockKey } from "./lockKeys.js";
 import { convertSaleProfile, isSaleProfile, readStructuredFile } from "./profile.js";
 
 /**
@@ -32,6 +32,8 @@ export interface SaleAssessment {
   platformStatus?: PlatformStatus | "TEST_ONLY";
   channel?: ChannelDecision["channel"];
   adapter?: string;
+  /** Verrous que `run` prendrait (clés identiques à celles de run). */
+  lockKeys?: LockKey[];
   startsAt?: string;
   startEpochMs?: number;
   event?: string;
@@ -47,6 +49,11 @@ export interface AssessOptions {
   catalog?: Catalog;
   env?: NodeJS.ProcessEnv;
   locksDir?: string;
+  /**
+   * Verrou(s) déjà détenu(s) par l'appelant (`sale:wait` pendant l'attente) : le contrôle vérifie alors qu'ils sont ENCORE détenus par cette
+   * instance (au lieu de lire un verrou « détenu » comme un obstacle).
+   */
+  ownLock?: EventLock;
   /** Mode humain explicite (`sale:wait --human`) : rappels seulement, aucun automatisme, aucune requête. */
   human?: boolean;
 }
@@ -144,6 +151,7 @@ export async function assessSale(target: string, opts: AssessOptions = {}): Prom
   }
 
   // ── 4. hôtes autorisés
+  let extraLocks: LockKey[] | undefined;
   if (adapter) {
     try {
       assertNetworkAllowed(adapter, cfg, catalog);
@@ -153,22 +161,27 @@ export async function assessSale(target: string, opts: AssessOptions = {}): Prom
       add("hosts", "Hôtes autorisés", "fail", (e as Error).message);
     }
 
-    // ── 5. verrous (lecture seule)
+    // ── 5. verrous (lecture seule, ou vérification du verrou détenu par l'appelant)
+    let lockKeys: LockKey[] = [];
     try {
-      const url = adapter.resolveEventUrl(cfg);
-      const keys: [string, string][] = [[eventKey(adapter.meta.id, url), "événement"]];
-      if (decision?.channel === "browser") keys.push([profileKey(cfg.browser.userDataDir ?? defaultUserDataDir(profileName(report.file))), "profil de navigateur"]);
-      const problems: string[] = [];
-      for (const [key, what] of keys) {
-        const l = inspectLock(key, opts.locksDir, now);
-        if (l.state === "held") problems.push(`verrou ${what} détenu par « ${l.owner?.instance} » (PID ${l.owner?.pid}, depuis ${l.owner?.startedAt})`);
-        else if (l.state === "stale") add("lock", "Verrou", "info", `verrou ${what} périmé : sera récupéré au lancement`);
+      lockKeys = lockKeysFor(adapter, cfg, decision!.channel, profileName(report.file));
+      if (opts.ownLock) {
+        if (opts.ownLock.verify()) add("lock", "Verrou", "ok", `détenu par cette instance (${lockKeys.map((k) => k.what).join(" + ")})`);
+        else add("lock", "Verrou", "fail", "verrou PERDU : il n'est plus détenu par cette instance (supprimé ou repris par une autre)");
+      } else {
+        const problems: string[] = [];
+        for (const { key, what } of lockKeys) {
+          const l = inspectLock(key, opts.locksDir, now);
+          if (l.state === "held") problems.push(`verrou ${what} détenu par « ${l.owner?.instance} » (PID ${l.owner?.pid}, depuis ${l.owner?.startedAt})`);
+          else if (l.state === "stale") add("lock", "Verrou", "info", `verrou ${what} périmé : sera récupéré au lancement`);
+        }
+        if (problems.length) add("lock", "Verrou", "fail", `${problems.join(" ; ")} — un seul bot par événement et par profil`);
+        else add("lock", "Verrou", "ok", "libre (événement et profil)");
       }
-      if (problems.length) add("lock", "Verrou", "fail", `${problems.join(" ; ")} — un seul bot par événement et par profil`);
-      else add("lock", "Verrou", "ok", "libre (événement et profil)");
     } catch (e) {
       add("lock", "Verrou", "fail", (e as Error).message);
     }
+    extraLocks = lockKeys;
   }
 
   // ── 6. critères de sélection, budget, quantité, comportement
@@ -199,7 +212,7 @@ export async function assessSale(target: string, opts: AssessOptions = {}): Prom
   add("behavior", "Comportement", cfg.behavior.autoAddToCart ? "ok" : "warn", `${cfg.behavior.autoAddToCart ? "ajout au panier automatique" : "sélection seulement (ajout au panier manuel)"} ; paiement TOUJOURS manuel`);
 
   const mode: SaleAssessment["mode"] = decision?.channel === "human" ? (opts.human ? "human" : "none") : decision ? "automatic" : "none";
-  return finish({ ...base, mode, channel: decision?.channel, adapter: adapter?.meta.id, platformStatus });
+  return finish({ ...base, mode, channel: decision?.channel, adapter: adapter?.meta.id, platformStatus, lockKeys: extraLocks });
 }
 
 const ICON: Record<CheckStatus, string> = { ok: "✓", fail: "✗", warn: "⚠", info: "·" };

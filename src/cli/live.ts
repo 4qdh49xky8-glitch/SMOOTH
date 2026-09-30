@@ -15,7 +15,8 @@ import { assertCompliant } from "../sites/compliance.js";
 import { discoverAdapters } from "../sites/registry.js";
 import type { AdapterContext, SiteAdapter } from "../sites/SiteAdapter.js";
 import { Clock, estimateOffset } from "../utils/clock.js";
-import { acquireEventLock, combineLocks, eventKey, profileKey, type EventLock } from "../utils/lock.js";
+import { lockKeysFor } from "../sale/lockKeys.js";
+import { acquireEventLock, combineLocks, type EventLock } from "../utils/lock.js";
 import { createLogger, pickLevel } from "../utils/logger.js";
 import { trackSecretEnv } from "../utils/redact.js";
 import { waitForEnter } from "../utils/prompt.js";
@@ -35,6 +36,12 @@ export interface LiveOptions {
 export interface LiveDeps {
   adapters?: SiteAdapter[];
   catalog?: Catalog;
+  /**
+   * Verrous DÉJÀ détenus par cette instance (`sale:wait` les conserve pendant toute l'attente) : `run` les reprend au lieu de les
+   * reprendre à zéro — aucun instant sans verrou entre l'attente et le lancement. Ce n'est qu'un transfert de propriété : les clés doivent
+   * être exactement celles que `run` calcule (sinon refus), et `run` les libère à la fin. Ne donne aucune autorisation.
+   */
+  held?: { lock: EventLock; keys: string[] };
 }
 
 /** Commandes qui pilotent une session : run, login, check. */
@@ -89,9 +96,20 @@ export async function liveCommand(o: LiveOptions, deps: LiveDeps = {}): Promise<
   let lock: EventLock | undefined;
   process.once("SIGINT", () => process.exit(130)); // déclenche 'exit' : les verrous sont libérés
   try {
-    locks.push(acquireEventLock(eventKey(adapter.meta.id, adapter.resolveEventUrl(config)), instance));
-    if (decision.channel === "browser") locks.push(acquireEventLock(profileKey(userDataDir), instance));
-    lock = combineLocks(...locks);
+    const wanted = lockKeysFor(adapter, config, decision.channel, profile).map((k) => k.key);
+    if (deps.held) {
+      const missing = wanted.filter((k) => !deps.held!.keys.includes(k));
+      if (missing.length || deps.held.keys.length !== wanted.length) {
+        deps.held.lock.release();
+        throw new Error("Les verrous détenus ne correspondent plus à l'événement/profil à lancer (configuration modifiée) : lancement refusé.");
+      }
+      if (!deps.held.lock.verify()) throw new Error("Le verrou d'événement n'est plus détenu par cette instance : lancement refusé.");
+      lock = deps.held.lock;
+      locks.push(lock);
+    } else {
+      for (const k of wanted) locks.push(acquireEventLock(k, instance));
+      lock = combineLocks(...locks);
+    }
 
     // Canal API : aucun navigateur. Canal navigateur : un navigateur par profil.
     const t0 = performance.now();

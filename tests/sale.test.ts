@@ -422,24 +422,19 @@ test("sale:wait — l'autorisation expire PENDANT l'attente → arrêt AVANT tou
   assert.match(w.out.join("\n"), /EXPIRED[\s\S]*plus READY pendant l'attente — arrêt AVANT tout contact/);
 });
 
-test("sale:wait — un verrou apparaît pendant l'attente, ou la configuration devient invalide → arrêt avant tout contact", async () => {
-  // verrou
+test("sale:wait — le verrou est PERDU pendant l'attente, ou la configuration devient invalide → arrêt avant tout contact", async () => {
+  // verrou supprimé par un tiers pendant l'attente
   const c1 = clock();
   const w1 = waitDeps(c1);
-  let held: ReturnType<typeof acquireEventLock> | undefined;
   let n = 0;
   w1.deps.sleep = async (ms: number) => {
     await c1.sleep(ms);
-    if (++n === 2) held = acquireEventLock(eventKey("p-web", "https://www.p.example/e/1"), "intrus#1", w1.locksDir);
+    if (++n === 2) for (const f of readdirSync(w1.locksDir)) writeFileSync(join(w1.locksDir, f), "{}"); // verrou écrasé (repris)
   };
   const file = writeYaml(sale({ sale: { startTime: new Date(NOW + 2 * 3600_000).toISOString().slice(0, 19), timezone: "UTC" } }));
-  try {
-    assert.equal(await saleWaitCommand({ target: file, recheckSeconds: 300 }, w1.deps), 1);
-    assert.deepEqual(w1.runs, []);
-    assert.match(w1.out.join("\n"), /Verrou : verrou événement détenu par « intrus#1 »/);
-  } finally {
-    held?.release();
-  }
+  assert.equal(await saleWaitCommand({ target: file, recheckSeconds: 300 }, w1.deps), 1);
+  assert.deepEqual(w1.runs, []);
+  assert.match(w1.out.join("\n"), /n'est plus détenu par cette instance/);
   // configuration modifiée (budget effacé) pendant l'attente : la réévaluation relit le fichier
   const c2 = clock();
   const w2 = waitDeps(c2);
@@ -452,6 +447,7 @@ test("sale:wait — un verrou apparaît pendant l'attente, ou la configuration d
   assert.equal(await saleWaitCommand({ target: f2, recheckSeconds: 300 }, w2.deps), 1);
   assert.deepEqual(w2.runs, []);
   assert.match(w2.out.join("\n"), /budget\.maxPrice : requis/);
+  assert.deepEqual(readdirSync(w2.locksDir), [], "verrous libérés après l'arrêt");
 });
 
 test("sale:wait — vente déjà proche : remise immédiate ; code de sortie du lancement relayé (aucun « CART_SUCCESS » sans panier)", async () => {

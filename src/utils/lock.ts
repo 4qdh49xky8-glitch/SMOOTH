@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 export interface EventLock {
@@ -7,12 +7,19 @@ export interface EventLock {
   release(): void;
   /** Ce processus détient-il ENCORE le verrou ? (fichier présent, même PID et même instance) */
   verify(): boolean;
+  /**
+   * Maintient le verrou pendant une longue attente : réécrit (atomiquement) sa date de renouvellement, ce qui repousse sa péremption
+   * (24 h sans renouvellement). Retourne false — sans rien écrire — si le verrou n'est plus détenu par cette instance.
+   */
+  renew(): boolean;
 }
 
 interface LockInfo {
   pid: number;
   instance: string;
   startedAt: string;
+  /** Dernier renouvellement par le détenteur (attente longue) ; la péremption à 24 h se compte depuis cette date si elle existe. */
+  renewedAt?: string;
   /** Heure de démarrage du processus (Linux : /proc/<pid>/stat) : distingue un PID réutilisé par un autre processus. */
   procStart?: string;
 }
@@ -59,7 +66,12 @@ export function profileKey(userDataDir: string): string {
 
 /** Regroupe plusieurs verrous : libérés ensemble, vérifiés ensemble. */
 export function combineLocks(...locks: EventLock[]): EventLock {
-  return { file: locks.map((l) => l.file).join("+"), release: () => locks.forEach((l) => l.release()), verify: () => locks.every((l) => l.verify()) };
+  return {
+    file: locks.map((l) => l.file).join("+"),
+    release: () => locks.forEach((l) => l.release()),
+    verify: () => locks.every((l) => l.verify()),
+    renew: () => locks.map((l) => l.renew()).every(Boolean),
+  };
 }
 
 /**
@@ -93,7 +105,18 @@ export function acquireEventLock(key: string, instance: string, dir = ".locks", 
           return false;
         }
       };
-      return { file, release, verify };
+      const renew = (): boolean => {
+        if (!verify()) return false;
+        try {
+          const tmp = `${file}.${process.pid}.tmp`;
+          writeFileSync(tmp, JSON.stringify({ ...mine, renewedAt: new Date().toISOString() }));
+          renameSync(tmp, file); // remplacement atomique : un lecteur ne voit jamais un fichier partiel
+          return true;
+        } catch {
+          return false;
+        }
+      };
+      return { file, release, verify, renew };
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
       let other: LockInfo | null = null;
@@ -104,7 +127,7 @@ export function acquireEventLock(key: string, instance: string, dir = ".locks", 
       }
       // Périmé : trop ancien, OU le PID existe mais appartient à un AUTRE processus que celui qui a posé le verrou (PID réutilisé).
       const reused = !!other?.procStart && !!other.pid && processStart(other.pid) !== undefined && processStart(other.pid) !== other.procStart;
-      const stale = !!other && (now - Date.parse(other.startedAt) > LOCK_MAX_AGE_MS || reused);
+      const stale = !!other && (now - Date.parse(other.renewedAt ?? other.startedAt) > LOCK_MAX_AGE_MS || reused);
       if (held.has(file) || (other && !stale && other.pid !== process.pid && alive(other.pid))) {
         throw new Error(
           `Une autre instance (« ${other?.instance ?? "ce processus"} », PID ${other?.pid ?? process.pid}, démarrée ${other?.startedAt ?? "?"}) cible déjà cet événement. ` +
@@ -145,7 +168,7 @@ export function inspectLock(key: string, dir = ".locks", now = Date.now()): Lock
   if (!info) return { state: "stale" };
   const owner = { instance: info.instance, pid: info.pid, startedAt: info.startedAt };
   const reused = !!info.procStart && processStart(info.pid) !== undefined && processStart(info.pid) !== info.procStart;
-  const old = now - Date.parse(info.startedAt) > LOCK_MAX_AGE_MS;
+  const old = now - Date.parse(info.renewedAt ?? info.startedAt) > LOCK_MAX_AGE_MS;
   if (held.has(file)) return { state: "held", owner };
   if (!old && !reused && info.pid !== process.pid && alive(info.pid)) return { state: "held", owner };
   return { state: "stale", owner };
