@@ -25,8 +25,16 @@
 | `NOT_ALLOWED` | preuve : rien d'automatisé (ou silence des conditions, noté `human`) | aucun |
 | `EXPIRED` | la preuve d'autorisation a plus de 180 jours | aucun |
 
-Plusieurs preuves : on prend l'**intersection** des canaux (la plus restrictive l'emporte). Une contradiction est
-signalée dans `conflicts`.
+**Plusieurs preuves** (seules les preuves valides, non expirées, comptent) :
+
+1. une preuve `human` (interdiction de toute automatisation) est un **veto** : aucune autre preuve ne le lève, ni plus récente ni
+   plus permissive ; seule son expiration (180 jours) la retire ;
+2. deux preuves de la **même page officielle** qui se contredisent : le **plus restrictif** l'emporte (`both` + `api` → `api` ;
+   `api` + `browser` → `NOT_ALLOWED`) ;
+3. des preuves de **pages différentes** s'additionnent canal par canal : conditions de l'API (`api`) + CGU du site (`browser`) →
+   `VERIFIED_API_AND_BROWSER`. Chaque canal autorisé a donc sa propre citation.
+
+Toute divergence est signalée dans `conflicts`.
 
 ## Format d'une preuve
 
@@ -107,3 +115,23 @@ Les tests (`tests/runSafety.test.ts`) vérifient qu'une plateforme `NOT_VERIFIED
 4. Relire avant les 180 jours (`doctor` avertit à 30 jours).
 
 Le tableau de toutes les plateformes se régénère avec `npm run platforms -- --markdown`. Ordre alphabétique, aucun classement.
+
+## Security model / Trust boundaries
+
+| Élément | Rôle | Ce qu'il ne peut pas faire |
+|---------|------|----------------------------|
+| **Catalogue** (`platforms/catalog.json`) | métadonnées : noms, régions, domaines officiels, pistes *non vérifiées* | accorder la moindre autorisation (des champs `status`/`channels` injectés sont sans effet) |
+| **Preuves** (`platforms/evidence/*.json`) | **seule** source d'autorisation : datée, HTTPS, domaine officiel, extrait cité, 180 jours | s'auto-valider : un fichier invalide est refusé et n'autorise rien |
+| **Garde du cœur** (`authorizeAdapter`, `assertAuthorized`, `resolveChannel`) | **application** : refus avant tout contact, rejouée à chaque reprise après une main humaine | être désactivée par un drapeau, une variable d'environnement, la config ou un adaptateur |
+| **Adaptateur** | implémentation technique d'un canal (capacités, sélecteurs, API) ; `meta` *déclare*, ne *décide* pas | s'autoriser lui-même, changer de plateforme, contourner un blocage |
+| **Config d'événement** | paramètres de l'utilisateur (quantité, budget, canal *restreint*) | accorder un canal : `channel` ne peut que **restreindre** ; forcé et indisponible → erreur explicite |
+| **Claude** | interprétation *optionnelle* en secours (réparer un sélecteur, diagnostiquer) ; hors du chemin nominal | toucher à l'autorisation, aux garde-fous, aux limites, aux CAPTCHA/files, au paiement ; point d'accès fixe (`api.anthropic.com`) |
+| **Paiement** | **toujours manuel** | rien dans le code ne le déclenche : URLs de paiement bloquées, `ApiClient` refuse chemins et corps de paiement, aucun champ bancaire lu ni rempli |
+
+Niveaux distincts dans le code : **autorisation de la plateforme** (preuves) → **capacité de l'adaptateur** (`meta`) →
+**configuration de l'événement**. Un niveau inférieur n'accorde jamais ce que le niveau supérieur n'accorde pas ; le test
+`tests/trustBoundaries.test.ts` le vérifie pour chaque statut non vérifié, chaque canal forcé et chaque commande (`run`, `login`, `check`).
+
+Limites connues : une preuve n'est pas *téléchargée* (l'auditeur doit citer la page réellement lue ; seul l'hôte de l'URL est
+contrôlé) ; le code des adaptateurs est du code de confiance du dépôt (le contrat balaie sa source, heuristique non exhaustive) ;
+l'autorisation est revérifiée à chaque reprise humaine mais pas en continu pendant une surveillance sans blocage.

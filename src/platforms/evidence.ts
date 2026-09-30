@@ -44,7 +44,7 @@ export interface EvidenceRecord {
 
 export type IssueCode =
   | "INVALID_JSON" | "NOT_OBJECT" | "UNKNOWN_FIELD" | "NO_PLATFORM" | "UNKNOWN_PLATFORM" | "NO_DATE" | "FUTURE_DATE" | "TOO_OLD"
-  | "NO_SOURCE" | "NO_HTTPS_URL" | "NO_TITLE" | "DOMAIN_MISMATCH" | "NO_EXCERPT" | "NO_AUTHORIZATION" | "BAD_TOPIC" | "BAD_CHANNEL" | "BAD_VALUE";
+  | "NO_SOURCE" | "NO_HTTPS_URL" | "CREDENTIALS_IN_URL" | "NO_TITLE" | "DOMAIN_MISMATCH" | "NO_EXCERPT" | "NO_AUTHORIZATION" | "BAD_TOPIC" | "BAD_CHANNEL" | "BAD_VALUE";
 
 export interface EvidenceIssue {
   code: IssueCode;
@@ -66,6 +66,13 @@ export const ageDays = (checkedAt: string, now: number): number => day(now) - da
 export const expiresAt = (checkedAt: string): string => new Date((dayOf(checkedAt) + EVIDENCE_MAX_AGE_DAYS) * DAY).toISOString().slice(0, 10);
 export const isExpired = (checkedAt: string, now: number): boolean => ageDays(checkedAt, now) > EVIDENCE_MAX_AGE_DAYS;
 export const daysUntilExpiry = (checkedAt: string, now: number): number => EVIDENCE_MAX_AGE_DAYS - ageDays(checkedAt, now);
+
+/** AAAA-MM-JJ d'un jour qui EXISTE : « 2026-02-30 » ou « 2026-09-31 » ne « débordent » pas silencieusement sur le mois suivant. */
+const isRealDate = (d: string): boolean => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+  const t = Date.parse(`${d}T00:00:00Z`);
+  return !Number.isNaN(t) && new Date(t).toISOString().slice(0, 10) === d;
+};
 
 const KNOWN_FIELDS = new Set(["platform", "checkedAt", "source", "topic", "channel", "value", "authorization", "excerpt", "note"]);
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
@@ -110,7 +117,7 @@ export function validateEvidence(raw: unknown, o: ValidateOptions): ValidationRe
 
   const checkedAt = str(raw.checkedAt);
   let expired = false;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(checkedAt) || Number.isNaN(Date.parse(`${checkedAt}T00:00:00Z`))) add("NO_DATE", "« checkedAt » (AAAA-MM-JJ) manquant ou invalide");
+  if (!isRealDate(checkedAt)) add("NO_DATE", "« checkedAt » (AAAA-MM-JJ) manquant ou invalide");
   else if (ageDays(checkedAt, o.now) < 0) add("FUTURE_DATE", "« checkedAt » est dans le futur");
   else if (isExpired(checkedAt, o.now)) {
     expired = true;
@@ -127,6 +134,7 @@ export function validateEvidence(raw: unknown, o: ValidateOptions): ValidationRe
     parsed = undefined;
   }
   if (source && (!parsed || parsed.protocol !== "https:")) add("NO_HTTPS_URL", "« source.url » doit être une URL https");
+  if (parsed && (parsed.username || parsed.password)) add("CREDENTIALS_IN_URL", "« source.url » ne doit contenir aucun identifiant (utilisateur:mot de passe@) : l'URL est conservée dans l'historique");
   if (source && !str(source.title)) add("NO_TITLE", "« source.title » (titre de la page officielle) manquant");
   if (platform && parsed?.protocol === "https:" && !hostMatches(url, platform.officialHosts))
     add("DOMAIN_MISMATCH", `le domaine ${parsed.hostname} n'est pas un domaine officiel de « ${platform.id} » (${platform.officialHosts.join(", ")})`);

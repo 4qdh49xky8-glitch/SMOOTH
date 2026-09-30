@@ -15,11 +15,25 @@ export interface RedactOptions {
   tokens?: boolean;
 }
 
-const SECRET_KEYS = "access[_-]?token|refresh[_-]?token|id[_-]?token|token|password|passwd|pwd|passphrase|secret|session[_-]?id|sessionid|session|sid|authorization|api[_-]?key|apikey|cookie|csrf|xsrf|signature";
+const SECRET_KEYS = "access[_-]?token|refresh[_-]?token|id[_-]?token|token|password|passwd|pwd|passphrase|secret|session[_-]?id|sessionid|session|sid|authorization|api[_-]?key|apikey|cookie|csrf|xsrf|signature|cvv2?|cvc2?|cid|card[_-]?number|card[_-]?no|pan|security[_-]?code";
+
+/** Variables d'environnement dont la VALEUR est un secret (par leur nom) : masquées telles quelles où qu'elles apparaissent. */
+const SECRET_ENV_NAME = /(key|token|secret|passw(or)?d|pwd|cookie|auth|credential|webhook|bearer|session)/i;
+const tracked = new Set<string>();
+/** Déclare d'autres variables (ex. `meta.requires.env` d'un adaptateur, `auth.envVar` d'un client API) dont la valeur est secrète. */
+export const trackSecretEnv = (...names: (string | undefined)[]): void => void names.forEach((n) => n && tracked.add(n));
+/** Valeurs secrètes courantes : lues À L'APPEL (un secret défini après le démarrage est quand même masqué). */
+export function secretValues(env: NodeJS.ProcessEnv = process.env): string[] {
+  const out: string[] = [];
+  for (const [k, v] of Object.entries(env)) if (v && v.length >= 8 && (tracked.has(k) || SECRET_ENV_NAME.test(k))) out.push(v);
+  return out.sort((a, b) => b.length - a.length);
+}
 
 export function redact(text: string, opts: RedactOptions = {}): string {
   const minDigits = opts.minDigits ?? 8;
   let s = text;
+  // 0. Valeurs exactes des secrets d'environnement (clé d'API, jeton, webhook…), même sous une forme inhabituelle.
+  for (const v of secretValues()) if (s.includes(v)) s = s.split(v).join("<secret>");
 
   // 1. URLs : sans paramètres, fragment ni identifiants intégrés.
   s = s.replace(/https?:\/\/[^\s"'<>)\]]+/gi, (m) => {
@@ -31,6 +45,10 @@ export function redact(text: string, opts: RedactOptions = {}): string {
       return "<url>";
     }
   });
+  // 1b. Identifiants intégrés à une URL d'un autre schéma (postgres://u:mdp@hôte, ftp://…) : retirés aussi.
+  s = s.replace(/\b([a-z][a-z0-9+.-]*:\/\/)[^\s/@"'<>]+@/gi, "$1<masqué>@");
+  // 1c. En-têtes Cookie / Set-Cookie : TOUTE la ligne de valeurs (a=1; b=2; …), pas seulement la première paire.
+  s = s.replace(/(\b(?:set-)?cookie["']?\s*:\s*)[^\r\n]+/gi, "$1<masqué>");
   // 2. Clés sensibles : password=…, "token": "…", Authorization: Bearer …
   s = s.replace(/\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{6,}/gi, "<masqué>");
   s = s.replace(new RegExp(`(["']?\\b(?:${SECRET_KEYS})["']?\\s*[:=]\\s*)(["']?)[^\\s"'&,;)\\]}]+`, "gi"), "$1$2<masqué>");
@@ -38,7 +56,7 @@ export function redact(text: string, opts: RedactOptions = {}): string {
   s = s.replace(/\bsk-[A-Za-z0-9_-]{16,}/g, "<clé-api>");
   s = s.replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, "<e-mail>");
   s = s.replace(/\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){3,7}(?:[ ]?[A-Z0-9]{1,4})?\b/g, "<iban>");
-  s = s.replace(/\b(?:\d[ -]?){13,19}\b/g, "<carte>");
+  s = s.replace(/\b(?:\d[ -]?){12,18}\d\b/g, "<carte>");
   s = s.replace(new RegExp(`\\d{${minDigits},}`, "g"), "<nombre>");
   if (opts.tokens) s = s.replace(/\b(?=[A-Za-z0-9_-]*\d)(?=[A-Za-z0-9_-]*[A-Za-z])[A-Za-z0-9_-]{16,}\b/g, "<jeton>");
   return s;

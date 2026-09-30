@@ -13,6 +13,12 @@ interface LockInfo {
   startedAt: string;
 }
 
+/**
+ * Un run dure quelques minutes ; un verrou de plus de 24 h est périmé même si son PID existe encore (PID réutilisé après
+ * un crash ou un redémarrage du conteneur) : sans cette borne, un verrou orphelin pourrait bloquer l'événement pour toujours.
+ */
+export const LOCK_MAX_AGE_MS = 24 * 3600_000;
+
 /** Verrous détenus par CE processus : une seconde acquisition dans le même processus est refusée aussi. */
 const held = new Set<string>();
 
@@ -37,7 +43,7 @@ export function eventKey(siteId: string, eventUrl: string): string {
  * elles multiplieraient les sessions et les paniers, ce que la plateforme s'interdit (limites d'achat).
  * Un verrou orphelin (processus mort) est récupéré automatiquement.
  */
-export function acquireEventLock(key: string, instance: string, dir = ".locks"): EventLock {
+export function acquireEventLock(key: string, instance: string, dir = ".locks", now = Date.now()): EventLock {
   mkdirSync(dir, { recursive: true });
   const file = join(dir, `${key}.lock`);
   const mine: LockInfo = { pid: process.pid, instance, startedAt: new Date().toISOString() };
@@ -63,7 +69,8 @@ export function acquireEventLock(key: string, instance: string, dir = ".locks"):
       } catch {
         /* verrou illisible : considéré orphelin */
       }
-      if (held.has(file) || (other && other.pid !== process.pid && alive(other.pid))) {
+      const stale = !!other && now - Date.parse(other.startedAt) > LOCK_MAX_AGE_MS;
+      if (held.has(file) || (other && !stale && other.pid !== process.pid && alive(other.pid))) {
         throw new Error(
           `Une autre instance (« ${other?.instance ?? "ce processus"} », PID ${other?.pid ?? process.pid}, démarrée ${other?.startedAt ?? "?"}) cible déjà cet événement. ` +
             "Le bot refuse deux sessions sur le même événement (pas de multiplication de sessions ni de paniers).",

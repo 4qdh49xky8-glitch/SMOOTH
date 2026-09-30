@@ -6,7 +6,7 @@ import type { Logger } from "../utils/logger.js";
 import { redact } from "../utils/redact.js";
 
 /** Tout élément ressemblant à une action de paiement est exclu, quoi que réponde le modèle. */
-const PAYMENT_RE = /(pay(er|ment|pal)?\b|paiement|checkout\/pay|place[- ]?order|commander|confirmer (la|votre) commande|finaliser|acheter maintenant|buy now|purchase)/i;
+const PAYMENT_RE = /(pay(er|ment|pal|s)?\b|paiement|checkout|place[- ]?order|order now|confirm(er)? (la|ma|votre|my|your|the)? ?(commande|achat|order|purchase)|valider (la|ma|mon|votre) (commande|achat)|passer (la|ma|votre) commande|commander|finaliser|acheter|buy\b|purchase|r[ée]gler|r[èe]glement|carte (bancaire|de cr[ée]dit)|credit card|card number|cvv|cvc|iban)/i;
 
 export const looksLikePayment = (s: string): boolean => PAYMENT_RE.test(s);
 
@@ -164,6 +164,9 @@ export interface MessagesClient {
  * balise, libellé court, aria-label, data-testid, id, chemin du lien — tous assainis (e-mails, cartes, longs nombres,
  * jetons masqués). JAMAIS : valeurs de champs, mots de passe, texte de la page, cookies, paramètres d'URL.
  */
+/** Point d'accès FIXE : ni ANTHROPIC_BASE_URL (variable d'environnement du SDK), ni la config ne peuvent rediriger les requêtes vers un autre domaine. */
+export const ANTHROPIC_API_URL = "https://api.anthropic.com";
+
 export class ClaudeAssistant {
   private client: MessagesClient | null;
   private callsLeft: number;
@@ -174,7 +177,7 @@ export class ClaudeAssistant {
     client?: MessagesClient,
   ) {
     const key = process.env.ANTHROPIC_API_KEY;
-    this.client = client ?? (cfg.enabled && key ? (new Anthropic({ apiKey: key, maxRetries: 0 }) as unknown as MessagesClient) : null);
+    this.client = client ?? (cfg.enabled && key ? (new Anthropic({ apiKey: key, maxRetries: 0, baseURL: ANTHROPIC_API_URL }) as unknown as MessagesClient) : null);
     if (cfg.enabled && !key && !client) log.warn("claude.enabled=true mais ANTHROPIC_API_KEY absent : assistant désactivé.");
     this.callsLeft = cfg.maxCallsPerRun;
   }

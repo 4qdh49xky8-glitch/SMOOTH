@@ -143,12 +143,18 @@ export class Agent {
     this.log.info(`État → ${s}${detail ? ` (${detail})` : ""}`);
   }
 
+  /** Autorisation de plateforme (preuves valides, non expirées, canal permis) ; rejouée à chaque reprise après une main humaine. */
+  private reauthorize(): void {
+    const { adapter } = this.d;
+    const catalog = this.d.catalog ?? (adapter.meta.compliance.policy === "demo" ? undefined : loadCatalog());
+    if (catalog) assertAuthorized(adapter.meta, catalog);
+  }
+
   async run(): Promise<RunResult> {
     const { adapter } = this.d;
     assertCompliant(adapter.meta, adapter.resolveEventUrl(this.d.config)); // refus avant toute action
     // Tout adaptateur non-démo doit correspondre à une plateforme dont les PREUVES officielles autorisent son canal.
-    const catalog = this.d.catalog ?? (adapter.meta.compliance.policy === "demo" ? undefined : loadCatalog());
-    if (catalog) assertAuthorized(adapter.meta, catalog);
+    this.reauthorize();
     let result: RunResult;
     try {
       result = await this.execute();
@@ -503,6 +509,9 @@ export class Agent {
       enter.cancel();
       if (detectable) await auto; // la boucle est terminée avant de reprendre : aucune action concurrente
     }
+    // Reprise (connexion, file d'attente, CAPTCHA, plan de salle) : l'autorisation est revérifiée AVANT toute nouvelle action.
+    // Une preuve qui expire pendant l'attente humaine (ou un catalogue modifié entre-temps) arrête le bot.
+    this.reauthorize();
     this.ackUntil.set(blocker.state, this.d.clock.now() + HUMAN_ACK_MS);
     this.state = before; // retour à l'état précédent (le blocage est levé)
     this.log.info("Reprise du bot.");

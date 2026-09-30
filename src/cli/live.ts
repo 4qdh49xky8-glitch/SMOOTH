@@ -17,6 +17,7 @@ import type { AdapterContext, SiteAdapter } from "../sites/SiteAdapter.js";
 import { Clock, estimateOffset } from "../utils/clock.js";
 import { acquireEventLock, eventKey } from "../utils/lock.js";
 import { createLogger, pickLevel } from "../utils/logger.js";
+import { trackSecretEnv } from "../utils/redact.js";
 import { waitForEnter } from "../utils/prompt.js";
 
 export interface LiveOptions {
@@ -70,6 +71,7 @@ export async function liveCommand(o: LiveOptions, deps: LiveDeps = {}): Promise<
   }
 
   const adapter = decision.adapter!;
+  trackSecretEnv(...(adapter.meta.requires?.env ?? []));
   // Défense en profondeur : même si le choix de canal était contourné, on revérifie l'autorisation AVANT d'ouvrir quoi que ce soit.
   assertAuthorized(adapter.meta, catalog);
   assertCompliant(adapter.meta, adapter.resolveEventUrl(config));

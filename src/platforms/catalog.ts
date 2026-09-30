@@ -74,7 +74,7 @@ export interface Missing {
 
 export interface PlatformState {
   status: PlatformStatus;
-  /** Canaux automatisés autorisés par les preuves valides (intersection : le plus restrictif l'emporte). */
+  /** Canaux automatisés autorisés par les preuves valides (voir stateOf : interdiction « human » prioritaire, même page → plus restrictif, pages différentes → canaux cumulés). */
   channels: Channel[];
   /** Première échéance parmi les preuves d'automatisation qui fondent le statut. */
   expiresAt?: string;
@@ -94,6 +94,12 @@ const TOPIC_LABEL: Record<Topic, string> = {
   cart: "mécanisme officiel de réservation/panier",
 };
 export const topicLabel = (t: Topic): string => TOPIC_LABEL[t];
+
+/** Identité d'une page officielle : origine + chemin (sans paramètres ni ancre, insensible à la casse et au « / » final). */
+const sourceKey = (url: string): string => {
+  const u = new URL(url);
+  return `${u.origin}${u.pathname.replace(/\/+$/, "")}`.toLowerCase();
+};
 
 const CHANNEL_SET: Record<string, Channel[]> = { api: ["official-api"], browser: ["browser"], both: ["official-api", "browser"], human: [] };
 
@@ -130,11 +136,23 @@ export function stateOf(c: Catalog, id: string, now = Date.now()): PlatformState
   if (auto.length === 0) return { ...base, status: "NOT_VERIFIED", channels: [], reasons: ["aucune preuve officielle d'automatisation"] };
   if (valid.length === 0) return { ...base, status: "EXPIRED", channels: [], reasons: [`toutes les preuves d'automatisation ont expiré (dernière : ${auto[0]!.checkedAt}, expirée le ${auto[0]!.expiresAt})`] };
 
-  // Intersection des canaux autorisés : en cas de preuves divergentes, le plus restrictif l'emporte.
-  let channels: Channel[] = ["official-api", "browser"];
-  for (const h of valid) channels = channels.filter((ch) => (CHANNEL_SET[h.channel ?? "human"] ?? []).includes(ch));
+  // Combinaison des preuves valides :
+  //  1. une preuve « human » (interdiction de toute automatisation) est un VETO : aucune autre preuve ne le lève (seule son expiration la lève) ;
+  //  2. deux preuves de la MÊME page officielle se contredisent-elles ? Le plus restrictif l'emporte (intersection) ;
+  //  3. des preuves de pages DIFFÉRENTES s'additionnent canal par canal (ex. conditions de l'API → api, CGU du site → browser) :
+  //     chacune cite son propre passage, donc chaque canal autorisé a sa propre justification.
+  const veto = valid.some((h) => h.channel === "human");
+  const groups = new Map<string, Channel[]>();
+  for (const h of valid) {
+    const key = sourceKey(h.url);
+    const allowed = CHANNEL_SET[h.channel ?? "human"] ?? [];
+    groups.set(key, (groups.get(key) ?? (["official-api", "browser"] as Channel[])).filter((ch) => allowed.includes(ch)));
+  }
+  const granted = new Set<Channel>();
+  for (const chs of groups.values()) for (const ch of chs) granted.add(ch);
+  const channels: Channel[] = veto ? [] : (["official-api", "browser"] as Channel[]).filter((ch) => granted.has(ch));
   const distinct = new Set(valid.map((h) => h.channel));
-  const conflicts = distinct.size > 1 ? [`preuves divergentes (${[...distinct].join(" / ")}) : le canal le plus restrictif s'applique jusqu'à expiration ou remplacement`] : [];
+  const conflicts = distinct.size > 1 ? [`preuves divergentes (${[...distinct].join(" / ")}) : une interdiction « human » prime ; deux preuves d'une même page se limitent au plus restrictif ; des pages différentes s'additionnent`] : [];
   const soonest = valid.map((h) => h.expiresAt).sort()[0]!;
   const common = { ...base, conflicts, expiresAt: soonest, expiresInDays: daysUntilExpiry(valid.map((h) => h.checkedAt).sort()[0]!, now) };
   if (channels.length === 0) return { ...common, status: "NOT_ALLOWED", channels: [], reasons: [valid.some((h) => h.channel === "human") ? "une preuve indique que l'automatisation n'est pas autorisée" : "preuves sans canal commun"] };

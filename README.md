@@ -79,6 +79,15 @@ aucun contact avec le site). Une plateforme non vérifiée n'est jamais automati
 **Ajouter un site = déposer un fichier dans `src/sites/`** : découverte automatique, aucun changement du cœur, du
 registre, de la config ni des commandes.
 
+## Security model / Trust boundaries
+
+- **Catalogue** = métadonnées. **Preuves officielles** (`platforms/evidence/`) = *seule* source d'autorisation (180 jours).
+- **Garde du cœur** = application, avant tout contact et à chaque reprise après une main humaine ; aucun drapeau/variable/config ne la désactive.
+- **Adaptateur** = implémentation technique (ne s'autorise pas lui-même). **Config d'événement** = paramètres ; le canal ne peut que restreindre.
+- **Claude** = interprétation optionnelle de secours, sans pouvoir sur l'autorisation, les garde-fous ni le paiement. **Paiement** = toujours manuel.
+
+Détail : [docs/PLATFORMS.md](docs/PLATFORMS.md#security-model--trust-boundaries).
+
 ## Documentation
 
 | Document | Contenu |

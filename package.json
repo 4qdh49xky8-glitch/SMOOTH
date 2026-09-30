@@ -15,7 +15,7 @@
     "check": "tsx src/index.ts check",
     "demo": "tsx scripts/demo.ts",
     "demo:server": "tsx demo/server.ts",
-    "test": "node --import tsx --test tests/*.test.ts tests/stress/*.test.ts",
+    "test": "node --import tsx --import ./tests/setup/noNetwork.ts --test tests/*.test.ts tests/stress/*.test.ts",
     "sites": "tsx src/index.ts sites",
     "validate": "tsx src/index.ts validate",
     "profiles": "tsx src/index.ts profiles",
