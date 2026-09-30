@@ -123,3 +123,24 @@ Aucune preuve n'a pu être consignée : l'environnement de développement bloque
 `www.eventbrite.com`, `www.ticketswap.com` → « CONNECT tunnel failed, response 403 » ; l'outil de lecture web → `EGRESS_BLOCKED`
 pour `dev.helloasso.com`, `developer.ticketmaster.com`, `www.eventbrite.com`, `www.weezevent.com`. Ni contournement, ni résumé de
 moteur de recherche, ni déduction : les 24 plateformes restent `NOT_VERIFIED` et **aucun adaptateur réel n'existe**.
+
+## Faits événementiels fournis par l'utilisateur (NON une preuve d'autorisation)
+
+Le schéma de preuves (`platforms/evidence/`) ne prévoit aucun sujet pour des **faits événementiels** (il ne couvre que l'automatisation
+et les sujets `api`, `queue`, `limits`, `cart`) : ils ne sont donc **pas** consignés comme preuve. Ils sont documentés ici, à titre
+d'information pour renseigner `config/sale.yaml`. **Aucune autorisation d'automatisation n'en découle** ; le statut des plateformes,
+le catalogue et les adaptateurs sont inchangés (toutes `NOT_VERIFIED`, aucun adaptateur réel).
+
+### SDM — Stade de France (contenu de la page fourni par l'utilisateur, non relu par le projet)
+
+| Information | Valeur fournie | Source |
+|---|---|---|
+| Événement | SDM | `https://www.stadefrance.com/fr/billetterie/sdm` (page consultée par l'utilisateur ; contenu recopié par lui) |
+| Date de l'événement | samedi 29 mai 2027 | idem |
+| Mise en vente générale | jeudi 1er octobre, 12h00 | idem |
+| Mention de la page | « BILLETTERIE OFFICIELLE » ; la billetterie du Stade de France est indiquée comme officielle et garantie | idem |
+| Automatisation (bots, API, Playwright…) | **Aucune phrase l'autorisant dans le contenu fourni** → aucune preuve d'automatisation, statut inchangé | idem |
+
+Non présents dans le contenu fourni, donc **inconnus** (rien n'est déduit) : année et fuseau horaire de la mise en vente, limite de billets
+par commande, conditions d'achat, identifiant de l'événement, plateforme technique de vente (le Stade de France n'est pas dans
+`platforms/catalog.json`). Une mise en vente « vendue sur une plateforme » n'est pas une autorisation d'automatiser.
