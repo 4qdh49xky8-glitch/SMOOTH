@@ -29,7 +29,8 @@ import { NOW, adapter, catalogWith, daysAgo, ev, plat } from "./helpers/platform
 const NOT_USABLE: [string, Catalog][] = [
   ["NOT_VERIFIED", catalogWith([plat("p")])],
   ["EXPIRED", catalogWith([plat("p")], [ev("p", "both", daysAgo(181))])],
-  ["NOT_ALLOWED", catalogWith([plat("p")], [ev("p", "human")])],
+  ["NOT_ALLOWED", catalogWith([plat("p")], [ev("p", "prohibited")])],
+  ["HUMAN_ONLY", catalogWith([plat("p")], [ev("p", "human")])],
 ];
 const cfg = (extra: Record<string, unknown> = {}): string => {
   const f = join(mkdtempSync(join(tmpdir(), "trust-")), "trust-test.json");
@@ -64,7 +65,7 @@ const withEnv = async <T>(vars: Record<string, string>, fn: () => Promise<T>): P
 // ───────────────────────────── point d'entrée par point d'entrée ─────────────────────────────
 test("aucun drapeau CLI ne peut transformer NOT_VERIFIED/EXPIRED/NOT_ALLOWED en exécution : les options d'autorisation n'existent pas", async () => {
   const web = adapter("p-web", { platform: "p", channel: "browser" });
-  for (const flag of [["--channel", "browser"], ["--channel", "official-api"], ["--force"], ["--allow-unverified"], ["--authorize"], ["--verified"], ["--status", "VERIFIED_BROWSER"], ["--evidence", "x"], ["--no-check"], ["--skip-authorization"], ["--unsafe"]]) {
+  for (const flag of [["--channel", "browser"], ["--channel", "official-api"], ["--force"], ["--allow-unverified"], ["--authorize"], ["--verified"], ["--status", "BROWSER_ONLY"], ["--evidence", "x"], ["--no-check"], ["--skip-authorization"], ["--unsafe"]]) {
     for (const cmd of ["run", "login", "check"]) {
       await assert.rejects(quiet(() => main([cmd, "--config", cfg(), ...flag], { adapters: [web], catalog: NOT_USABLE[0]![1] })), /Unknown option|Unexpected|unknown/i, `${cmd} ${flag.join(" ")}`);
     }
@@ -74,7 +75,7 @@ test("aucun drapeau CLI ne peut transformer NOT_VERIFIED/EXPIRED/NOT_ALLOWED en 
 
 test("variables d'environnement « malveillantes » : aucune ne change l'autorisation ni le canal", async () => {
   const web = adapter("p-web", { platform: "p", channel: "browser" });
-  const vars = { FORCE_CHANNEL: "browser", CHANNEL: "browser", ALLOW_UNVERIFIED: "1", PLATFORM_STATUS: "VERIFIED_BROWSER", PLATFORM_VERIFIED: "true", EVIDENCE_DIR: "/tmp", NODE_ENV: "test", SKIP_AUTH: "1", DEBUG: "*" };
+  const vars = { FORCE_CHANNEL: "browser", CHANNEL: "browser", ALLOW_UNVERIFIED: "1", PLATFORM_STATUS: "BROWSER_ONLY", PLATFORM_VERIFIED: "true", EVIDENCE_DIR: "/tmp", NODE_ENV: "test", SKIP_AUTH: "1", DEBUG: "*" };
   for (const [label, cat] of NOT_USABLE) {
     const d = await withEnv(vars, async () => resolveChannel({ platform: "p", adapters: [web], catalog: cat, env: { ...process.env, ...vars }, config: { channel: "auto" }, now: NOW }));
     assert.equal(d.channel, "human", label);
@@ -120,8 +121,8 @@ test("niveau 3 : aucune clé de configuration d'événement n'accorde d'autorisa
   const web = adapter("p-web", { platform: "p", channel: "browser" });
   const grabs = [
     { channel: "browser" },
-    { siteOptions: { channel: "browser", authorized: true, allowUnverified: true, status: "VERIFIED_BROWSER", evidence: { channel: "both" } } },
-    { authorization: "both", verified: true, status: "VERIFIED_API_AND_BROWSER", allowedChannels: ["browser"], compliance: { policy: "permitted-by-terms", reviewedAt: "2099-01-01" } },
+    { siteOptions: { channel: "browser", authorized: true, allowUnverified: true, status: "BROWSER_ONLY", evidence: { channel: "both" } } },
+    { authorization: "both", verified: true, status: "API_AND_BROWSER", allowedChannels: ["browser"], compliance: { policy: "permitted-by-terms", reviewedAt: "2099-01-01" } },
     { platform: "p", channel: "browser" }, // l'exemple de la demande
   ];
   for (const [label, cat] of NOT_USABLE) for (const g of grabs) {
@@ -187,7 +188,9 @@ for (const state of ["CAPTCHA", "QUEUE", "LOGIN_REQUIRED"] as const) {
     const result = await agentFor(web, cat, async () => {
       cat.evidence.length = 0; // pendant que l'humain traite le blocage : la preuve disparaît (ou expire)
     }).run();
-    assert.equal(result.status, "error", "le bot ne reprend pas");
+    assert.equal(result.status, "authorization-expired", "le bot ne reprend pas");
+    assert.equal(result.finalState, "AUTHORIZATION_EXPIRED");
+    assert.equal(result.failureReason, "AUTHORIZATION_EXPIRED");
     assert.equal(web.calls.filter((c) => c.startsWith("selectOffer")).length, 1, "aucune nouvelle sélection après la reprise");
     assert.ok(!web.calls.includes("addToCart"), "aucun ajout au panier après la reprise");
   });

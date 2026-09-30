@@ -16,6 +16,8 @@ export const PlatformSchema = z.object({
   eventTypes: z.array(z.enum(EVENT_TYPES)).min(1),
   /** Domaines officiels : seules des preuves hébergées sur ces domaines sont acceptées. */
   officialHosts: z.array(z.string().min(3)).min(1),
+  /** Paramètres de requête tolérés dans l'URL d'une preuve (défaut : aucun). */
+  allowedQueryParams: z.array(z.string().min(1)).default([]),
   /** Pistes NON vérifiées (jamais prises en compte pour une décision). */
   clues: z.array(z.object({ url: z.string().url(), note: z.string(), verified: z.literal(false), origin: z.string() })).default([]),
 });
@@ -29,24 +31,31 @@ export interface Catalog {
 }
 
 /**
- * NOT_VERIFIED              aucune preuve d'automatisation
- * VERIFIED_API              une preuve autorise l'API officielle
- * VERIFIED_BROWSER          une preuve autorise l'automatisation de l'interface
- * VERIFIED_API_AND_BROWSER  une preuve autorise les deux
- * NOT_ALLOWED               les preuves n'autorisent aucun canal automatisé (interdit, ou preuves contradictoires)
- * EXPIRED                   il existe des preuves, mais toutes datent de plus de 180 jours
+ * Autorisation EXPLICITE PAR CANAL. L'absence de preuve pour un canal signifie « non autorisé ».
+ *
+ * NOT_VERIFIED   aucune preuve d'automatisation                     → rien d'automatisé
+ * API_ONLY       preuve pour l'API officielle uniquement             → API oui, navigateur NON
+ * BROWSER_ONLY   preuve pour l'interface uniquement                  → navigateur oui, API NON
+ * API_AND_BROWSER preuves pour les deux                              → les deux
+ * HUMAN_ONLY     la source indique que seule l'intervention humaine est possible → rappels, achat manuel
+ * NOT_ALLOWED    la source INTERDIT l'automatisation (ou preuves sans canal commun) → rien d'automatisé
+ * EXPIRED        il existe des preuves, mais toutes datent de plus de 180 jours   → rien d'automatisé
  */
-export const STATUSES = ["NOT_VERIFIED", "VERIFIED_API", "VERIFIED_BROWSER", "VERIFIED_API_AND_BROWSER", "NOT_ALLOWED", "EXPIRED"] as const;
+export const STATUSES = ["NOT_VERIFIED", "API_ONLY", "BROWSER_ONLY", "API_AND_BROWSER", "HUMAN_ONLY", "EXPIRED", "NOT_ALLOWED"] as const;
 export type PlatformStatus = (typeof STATUSES)[number];
 
 export const STATUS_HELP: Record<PlatformStatus, string> = {
   NOT_VERIFIED: "aucune preuve officielle valide : rien n'est automatisé",
-  VERIFIED_API: "API officielle autorisée par une preuve valide",
-  VERIFIED_BROWSER: "automatisation de l'interface autorisée par une preuve valide",
-  VERIFIED_API_AND_BROWSER: "API officielle et interface autorisées par des preuves valides",
-  NOT_ALLOWED: "automatisation non autorisée (interdite ou preuves contradictoires) : achat humain seulement",
+  API_ONLY: "API officielle autorisée par une preuve valide ; navigateur NON autorisé",
+  BROWSER_ONLY: "automatisation de l'interface autorisée par une preuve valide ; API NON autorisée",
+  API_AND_BROWSER: "API officielle et interface autorisées par des preuves valides",
+  HUMAN_ONLY: "seule l'intervention humaine est possible (rappels, achat manuel) : aucun automatisme",
   EXPIRED: `preuves de plus de ${EVIDENCE_MAX_AGE_DAYS} jours : à revérifier, rien n'est automatisé`,
+  NOT_ALLOWED: "automatisation interdite par la source (ou preuves sans canal commun) : aucune exécution automatisée",
 };
+
+/** Statuts qui autorisent au moins un canal automatisé. */
+export const AUTOMATABLE: readonly PlatformStatus[] = ["API_ONLY", "BROWSER_ONLY", "API_AND_BROWSER"];
 
 export type Channel = "official-api" | "browser";
 
@@ -101,7 +110,7 @@ const sourceKey = (url: string): string => {
   return `${u.origin}${u.pathname.replace(/\/+$/, "")}`.toLowerCase();
 };
 
-const CHANNEL_SET: Record<string, Channel[]> = { api: ["official-api"], browser: ["browser"], both: ["official-api", "browser"], human: [] };
+const CHANNEL_SET: Record<string, Channel[]> = { api: ["official-api"], browser: ["browser"], both: ["official-api", "browser"], human: [], prohibited: [] };
 
 /** Statut d'une plateforme, déduit UNIQUEMENT des preuves valides et non expirées à l'instant `now`. */
 export function stateOf(c: Catalog, id: string, now = Date.now()): PlatformState {
@@ -141,7 +150,8 @@ export function stateOf(c: Catalog, id: string, now = Date.now()): PlatformState
   //  2. deux preuves de la MÊME page officielle se contredisent-elles ? Le plus restrictif l'emporte (intersection) ;
   //  3. des preuves de pages DIFFÉRENTES s'additionnent canal par canal (ex. conditions de l'API → api, CGU du site → browser) :
   //     chacune cite son propre passage, donc chaque canal autorisé a sa propre justification.
-  const veto = valid.some((h) => h.channel === "human");
+  const prohibited = valid.some((h) => h.channel === "prohibited");
+  const veto = prohibited || valid.some((h) => h.channel === "human");
   const groups = new Map<string, Channel[]>();
   for (const h of valid) {
     const key = sourceKey(h.url);
@@ -155,8 +165,10 @@ export function stateOf(c: Catalog, id: string, now = Date.now()): PlatformState
   const conflicts = distinct.size > 1 ? [`preuves divergentes (${[...distinct].join(" / ")}) : une interdiction « human » prime ; deux preuves d'une même page se limitent au plus restrictif ; des pages différentes s'additionnent`] : [];
   const soonest = valid.map((h) => h.expiresAt).sort()[0]!;
   const common = { ...base, conflicts, expiresAt: soonest, expiresInDays: daysUntilExpiry(valid.map((h) => h.checkedAt).sort()[0]!, now) };
-  if (channels.length === 0) return { ...common, status: "NOT_ALLOWED", channels: [], reasons: [valid.some((h) => h.channel === "human") ? "une preuve indique que l'automatisation n'est pas autorisée" : "preuves sans canal commun"] };
-  const status: PlatformStatus = channels.length === 2 ? "VERIFIED_API_AND_BROWSER" : channels[0] === "official-api" ? "VERIFIED_API" : "VERIFIED_BROWSER";
+  if (prohibited) return { ...common, status: "NOT_ALLOWED", channels: [], reasons: ["une preuve valide indique que la source interdit l'automatisation"] };
+  if (veto) return { ...common, status: "HUMAN_ONLY", channels: [], reasons: ["une preuve valide indique que seule l'intervention humaine est possible"] };
+  if (channels.length === 0) return { ...common, status: "NOT_ALLOWED", channels: [], reasons: ["preuves sans canal commun (contradiction sur une même page)"] };
+  const status: PlatformStatus = channels.length === 2 ? "API_AND_BROWSER" : channels[0] === "official-api" ? "API_ONLY" : "BROWSER_ONLY";
   return { ...common, status, channels, reasons: [`canaux autorisés par les preuves : ${channels.join(" → ")}`] };
 }
 

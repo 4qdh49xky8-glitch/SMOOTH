@@ -54,3 +54,19 @@ export class HumanRequiredError extends Error {
     this.name = "HumanRequiredError";
   }
 }
+
+/** L'autorisation de la plateforme n'est plus valable (preuve expirée, retirée, canal ou hôte non autorisé) : arrêt, AUCUNE requête de plus. */
+export class AuthorizationExpiredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AuthorizationExpiredError";
+  }
+}
+
+/** Le verrou d'événement n'est plus détenu par ce processus (supprimé ou repris) : un autre bot pourrait cibler le même événement. */
+export class LockLostError extends Error {
+  constructor(message = "Le verrou d'événement n'est plus détenu par cette instance") {
+    super(message);
+    this.name = "LockLostError";
+  }
+}

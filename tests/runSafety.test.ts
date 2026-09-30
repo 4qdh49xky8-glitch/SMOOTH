@@ -14,13 +14,14 @@ import { FakeAdapter, offer } from "./helpers/fakeAdapter.js";
 import { NOW, adapter, catalogWith, daysAgo, ev, plat } from "./helpers/platformFixtures.js";
 
 /**
- * Une plateforme qui n'est pas VERIFIED_* (NOT_VERIFIED, EXPIRED, NOT_ALLOWED — ou absente du catalogue) ne doit
+ * Une plateforme qui n'est pas API_ONLY | BROWSER_ONLY | API_AND_BROWSER (NOT_VERIFIED, EXPIRED, NOT_ALLOWED — ou absente du catalogue) ne doit
  * JAMAIS pouvoir être exécutée par `run` : ni par défaut, ni par erreur, ni par un canal forcé.
  */
 const NOT_USABLE: [string, Catalog][] = [
   ["NOT_VERIFIED", catalogWith([plat("p")])],
   ["EXPIRED", catalogWith([plat("p")], [ev("p", "both", daysAgo(181))])],
-  ["NOT_ALLOWED", catalogWith([plat("p")], [ev("p", "human")])],
+  ["NOT_ALLOWED", catalogWith([plat("p")], [ev("p", "prohibited")])],
+  ["HUMAN_ONLY", catalogWith([plat("p")], [ev("p", "human")])],
   ["absente du catalogue", catalogWith([])],
 ];
 const cfg = (extra: Record<string, unknown> = {}): string => {
@@ -83,7 +84,7 @@ for (const [label, cat] of NOT_USABLE) {
   });
 }
 
-test("balayage : pour CHAQUE statut non vérifié, aucun canal n'autorise un adaptateur — l'autorisation exige VERIFIED_*", () => {
+test("balayage : pour CHAQUE statut non vérifié, aucun canal n'autorise un adaptateur — l'autorisation exige API_ONLY | BROWSER_ONLY | API_AND_BROWSER", () => {
   const seen = new Set<string>();
   for (const [, cat] of NOT_USABLE) {
     const status = stateOf(cat, "p", NOW).status;
@@ -94,11 +95,11 @@ test("balayage : pour CHAQUE statut non vérifié, aucun canal n'autorise un ada
       assert.equal(resolveChannel({ platform: "p", adapters: [a], catalog: cat, env: { P_API_KEY: "x" }, config: { channel: "auto" }, now: NOW }).adapter, undefined);
     }
   }
-  assert.deepEqual([...seen].sort(), ["EXPIRED", "NOT_ALLOWED", "NOT_VERIFIED"]);
-  // et réciproquement : seuls les trois statuts VERIFIED_* autorisent, et uniquement les canaux prouvés
+  assert.deepEqual([...seen].sort(), ["EXPIRED", "HUMAN_ONLY", "NOT_ALLOWED", "NOT_VERIFIED"]);
+  // et réciproquement : seuls les trois statuts API_ONLY | BROWSER_ONLY | API_AND_BROWSER autorisent, et uniquement les canaux prouvés
   const ok = (s: "api" | "browser" | "both", ch: "official-api" | "browser") => authorizeAdapter(adapter("x", { platform: "p", channel: ch }).meta, catalogWith([plat("p")], [ev("p", s)]), NOW).ok;
   assert.deepEqual([ok("api", "official-api"), ok("api", "browser"), ok("browser", "official-api"), ok("browser", "browser"), ok("both", "official-api"), ok("both", "browser")], [true, false, false, true, true, true]);
-  assert.equal(STATUSES.filter((s) => s.startsWith("VERIFIED")).length, 3);
+  assert.equal(STATUSES.length, 7);
 });
 
 test("run : l'expiration s'applique AU MOMENT du run — preuve de 180 jours → exécution ; de 181 jours → humain", async () => {

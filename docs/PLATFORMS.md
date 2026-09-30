@@ -14,27 +14,19 @@
 - Le **statut est calculé** à chaque lancement à partir des preuves valides. On ne le saisit jamais à la main.
 - Une preuve vaut **180 jours** (jour 180 valide, jour 181 expiré), puis la plateforme repasse `EXPIRED`.
 
-## Statuts
+## Statuts (autorisation explicite par canal)
 
-| Statut | Signification | Canaux autorisés |
-|--------|---------------|------------------|
-| `NOT_VERIFIED` | aucune preuve valide sur l'automatisation | aucun (humain) |
-| `VERIFIED_API` | preuve : API officielle autorisée | `official-api` |
-| `VERIFIED_BROWSER` | preuve : automatisation de l'interface autorisée | `browser` |
-| `VERIFIED_API_AND_BROWSER` | preuve : les deux | `official-api`, `browser` |
-| `NOT_ALLOWED` | preuve : rien d'automatisé (ou silence des conditions, noté `human`) | aucun |
+**L'absence de preuve pour un canal signifie « non autorisé ».**
+
+| Statut | Signification | Canaux automatisés autorisés |
+|--------|---------------|------------------------------|
+| `NOT_VERIFIED` | aucune preuve valide | aucun (humain) |
+| `API_ONLY` | preuve `api` | `official-api` ; le navigateur est **interdit** |
+| `BROWSER_ONLY` | preuve `browser` | `browser` ; l'API est **interdite** |
+| `API_AND_BROWSER` | preuves `api` + `browser` (ou `both`) | `official-api`, `browser` |
+| `HUMAN_ONLY` | preuve `human` : seule l'intervention humaine est possible | aucun (rappels, achat manuel) |
 | `EXPIRED` | la preuve d'autorisation a plus de 180 jours | aucun |
-
-**Plusieurs preuves** (seules les preuves valides, non expirées, comptent) :
-
-1. une preuve `human` (interdiction de toute automatisation) est un **veto** : aucune autre preuve ne le lève, ni plus récente ni
-   plus permissive ; seule son expiration (180 jours) la retire ;
-2. deux preuves de la **même page officielle** qui se contredisent : le **plus restrictif** l'emporte (`both` + `api` → `api` ;
-   `api` + `browser` → `NOT_ALLOWED`) ;
-3. des preuves de **pages différentes** s'additionnent canal par canal : conditions de l'API (`api`) + CGU du site (`browser`) →
-   `VERIFIED_API_AND_BROWSER`. Chaque canal autorisé a donc sa propre citation.
-
-Toute divergence est signalée dans `conflicts`.
+| `NOT_ALLOWED` | preuve `prohibited` : la source interdit l'automatisation | aucun |
 
 ## Format d'une preuve
 
@@ -44,17 +36,17 @@ Toute divergence est signalée dans `conflicts`.
   "checkedAt": "2026-09-29",
   "topic": "automation",
   "source": { "url": "https://www.eventim.fr/...", "title": "Titre exact de la page" },
-  "channel": "human",
+  "channel": "browser",
   "authorization": "Phrase indiquant ce que la source autorise ou interdit",
   "excerpt": "Passage recopié tel quel depuis la page officielle (≥ 30 caractères)",
   "note": "facultatif"
 }
 ```
 
-Sujets (`topic`) : `automation` (bloquant, porte `channel` : `api` · `browser` · `both` · `human`), puis `api`, `queue`,
+Sujets (`topic`) : `automation` (bloquant, porte `channel` : `api` · `browser` · `both` · `human` = seule l'intervention humaine · `prohibited` = automatisation interdite), puis `api`, `queue`,
 `limits`, `cart` (complémentaires, portent `value`). Un fichier par preuve ; les champs inconnus sont refusés.
 
-**Refus automatique** : URL non HTTPS ; date absente, future ou de plus de 180 jours ; extrait absent ou < 30
+**Refus automatique** : URL non HTTPS, avec identifiants, fragment, paramètres de requête (sauf `allowedQueryParams` du catalogue) ou ressemblant à une redirection ; date absente, inexistante, future ou de plus de 180 jours ; extrait absent ou < 30
 caractères ; autorisation < 10 caractères ; domaine différent des `officialHosts` de la plateforme (ou sous-domaine
 d'un de ceux-ci) ; plateforme inconnue ; sujet/canal/valeur invalide. Un fichier refusé n'autorise rien ; il est
 signalé par `platform check`, `platforms` et `doctor`.
@@ -91,10 +83,10 @@ Les tests (`tests/runSafety.test.ts`) vérifient qu'une plateforme `NOT_VERIFIED
 
 ## Créer un adaptateur (`new-site`)
 
-- Plateforme **au statut compatible** (`VERIFIED_*` incluant le canal demandé) → adaptateur utilisable.
+- Plateforme **dont le statut inclut le canal demandé** (`API_ONLY`, `BROWSER_ONLY`, `API_AND_BROWSER`) → adaptateur utilisable.
 - Plateforme `NOT_VERIFIED` / `EXPIRED` → **squelette explicitement marqué `@skeleton-status NOT_VERIFIED`** : il échoue au
   contrat et n'est jamais lancé.
-- Plateforme `NOT_ALLOWED` → **refus, aucun fichier** (choix délibéré : ne pas produire de code pour ce qui est interdit).
+- Plateforme `NOT_ALLOWED` ou `HUMAN_ONLY`, ou canal non autorisé → **refus, aucun fichier** (choix délibéré : pas de code pour ce qui n'est pas autorisé).
 
 ## Interface pour les futurs adaptateurs API (aucune API réelle implémentée)
 
@@ -118,20 +110,14 @@ Le tableau de toutes les plateformes se régénère avec `npm run platforms -- -
 
 ## Security model / Trust boundaries
 
-| Élément | Rôle | Ce qu'il ne peut pas faire |
-|---------|------|----------------------------|
-| **Catalogue** (`platforms/catalog.json`) | métadonnées : noms, régions, domaines officiels, pistes *non vérifiées* | accorder la moindre autorisation (des champs `status`/`channels` injectés sont sans effet) |
-| **Preuves** (`platforms/evidence/*.json`) | **seule** source d'autorisation : datée, HTTPS, domaine officiel, extrait cité, 180 jours | s'auto-valider : un fichier invalide est refusé et n'autorise rien |
-| **Garde du cœur** (`authorizeAdapter`, `assertAuthorized`, `resolveChannel`) | **application** : refus avant tout contact, rejouée à chaque reprise après une main humaine | être désactivée par un drapeau, une variable d'environnement, la config ou un adaptateur |
-| **Adaptateur** | implémentation technique d'un canal (capacités, sélecteurs, API) ; `meta` *déclare*, ne *décide* pas | s'autoriser lui-même, changer de plateforme, contourner un blocage |
-| **Config d'événement** | paramètres de l'utilisateur (quantité, budget, canal *restreint*) | accorder un canal : `channel` ne peut que **restreindre** ; forcé et indisponible → erreur explicite |
-| **Claude** | interprétation *optionnelle* en secours (réparer un sélecteur, diagnostiquer) ; hors du chemin nominal | toucher à l'autorisation, aux garde-fous, aux limites, aux CAPTCHA/files, au paiement ; point d'accès fixe (`api.anthropic.com`) |
-| **Paiement** | **toujours manuel** | rien dans le code ne le déclenche : URLs de paiement bloquées, `ApiClient` refuse chemins et corps de paiement, aucun champ bancaire lu ni rempli |
+Voir [SECURITY.md](SECURITY.md). En bref : catalogue = métadonnées · preuves = seule source d'autorisation · garde du cœur =
+application (avant tout réseau, à chaque reprise, périodiquement) · adaptateur = implémentation technique · configuration =
+restriction uniquement · Claude = interprétation optionnelle · paiement = toujours manuel.
 
-Niveaux distincts dans le code : **autorisation de la plateforme** (preuves) → **capacité de l'adaptateur** (`meta`) →
-**configuration de l'événement**. Un niveau inférieur n'accorde jamais ce que le niveau supérieur n'accorde pas ; le test
-`tests/trustBoundaries.test.ts` le vérifie pour chaque statut non vérifié, chaque canal forcé et chaque commande (`run`, `login`, `check`).
+## État de la recherche de sources officielles (2026-09-30)
 
-Limites connues : une preuve n'est pas *téléchargée* (l'auditeur doit citer la page réellement lue ; seul l'hôte de l'URL est
-contrôlé) ; le code des adaptateurs est du code de confiance du dépôt (le contrat balaie sa source, heuristique non exhaustive) ;
-l'autorisation est revérifiée à chaque reprise humaine mais pas en continu pendant une surveillance sans blocage.
+Aucune preuve n'a pu être consignée : l'environnement de développement bloque les domaines officiels (proxy de sortie). Essais :
+`curl` sur `dev.helloasso.com`, `developer.ticketmaster.com`, `www.eventim.fr`, `www.helloasso.com`, `www.weezevent.com`,
+`www.eventbrite.com`, `www.ticketswap.com` → « CONNECT tunnel failed, response 403 » ; l'outil de lecture web → `EGRESS_BLOCKED`
+pour `dev.helloasso.com`, `developer.ticketmaster.com`, `www.eventbrite.com`, `www.weezevent.com`. Ni contournement, ni résumé de
+moteur de recherche, ni déduction : les 24 plateformes restent `NOT_VERIFIED` et **aucun adaptateur réel n'existe**.

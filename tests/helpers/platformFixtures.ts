@@ -10,7 +10,7 @@ export const NOW = Date.parse(`${TODAY}T12:00:00Z`);
 export const daysAgo = (n: number, now = NOW): string => new Date(now - n * DAY).toISOString().slice(0, 10);
 
 export const plat = (id = "p", over: Partial<Platform> = {}): Platform => ({
-  id, name: `Plateforme ${id}`, regions: ["FR"], eventTypes: ["concert"], officialHosts: [`${id}.example`], clues: [], ...over,
+  id, name: `Plateforme ${id}`, regions: ["FR"], eventTypes: ["concert"], officialHosts: [`${id}.example`], clues: [], allowedQueryParams: [], ...over,
 });
 
 /** Preuve d'automatisation (par défaut valide, du jour). */

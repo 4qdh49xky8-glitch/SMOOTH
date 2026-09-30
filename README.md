@@ -86,12 +86,13 @@ registre, de la config ni des commandes.
 - **Adaptateur** = implémentation technique (ne s'autorise pas lui-même). **Config d'événement** = paramètres ; le canal ne peut que restreindre.
 - **Claude** = interprétation optionnelle de secours, sans pouvoir sur l'autorisation, les garde-fous ni le paiement. **Paiement** = toujours manuel.
 
-Détail : [docs/PLATFORMS.md](docs/PLATFORMS.md#security-model--trust-boundaries).
+Détail : [docs/SECURITY.md](docs/SECURITY.md).
 
 ## Documentation
 
 | Document | Contenu |
 |----------|---------|
+| [docs/SECURITY.md](docs/SECURITY.md) | **modèle d'autorisation par canal, preuves, verrous, reprise, réseau, secrets, Claude, limites** |
 | [docs/PLATFORMS.md](docs/PLATFORMS.md) | **catalogue et preuves** : statuts, format et refus des preuves (expiration 180 jours), historique, commandes, interface API, choix du canal API → navigateur → humain |
 | [docs/ADDING_A_SITE.md](docs/ADDING_A_SITE.md) | créer un adaptateur : autorisation d'abord, squelette, méthodes, états, offres, sélecteurs, tests, checklist |
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | profils et héritage, référence des champs, stratégie de sélection, recettes par type d'événement |
@@ -141,7 +142,7 @@ Optimisations en place, toutes conformes aux règles ci-dessus :
 - **Horloge** calée façon NTP (échantillon au plus petit RTT) ; sans heure serveur précise, repli sur l'en-tête `Date` (±500 ms).
 - **Préchauffage** avant l'ouverture : connexion, page chargée, connexion HTTP/TLS ouverte.
 - **Détection sans rendu** (`fetchSale` léger), deep links, locators combinés, attentes événementielles, aucun `sleep` chaud.
-- **CDP** : images/polices/analytics bloqués pendant la course, timers non bridés, `--trace` pour DNS/connexion/TTFB.
+- **CDP** : images/polices/vidéos évitées pendant la course (aucun script bloqué), timers non bridés, `--trace` pour DNS/connexion/TTFB.
 
 Pistes : machine proche du serveur, Ethernet, API officielle du site quand elle existe, cadence réduite seulement si
 le site l'autorise.

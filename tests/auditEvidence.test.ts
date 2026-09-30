@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -49,7 +49,7 @@ test("domaine : sosies, sous-domaines d'un tiers, identifiants intégrés, barre
     "https://[::1]/x",
   ];
   for (const u of refused) assert.ok(codes(url(u)).some((c) => c === "DOMAIN_MISMATCH" || c === "NO_HTTPS_URL"), `refusée : ${u}`);
-  for (const u of ["https://p.example/x", "https://www.p.example/x", "https://a.b.p.example/x", "HTTPS://WWW.P.EXAMPLE/X", "https://www.p.example:8443/x?q=1#frag"]) assert.deepEqual(codes(url(u)), [], `acceptée : ${u}`);
+  for (const u of ["https://p.example/x", "https://www.p.example/x", "https://a.b.p.example/x", "HTTPS://WWW.P.EXAMPLE/X", "https://www.p.example:8443/x"]) assert.deepEqual(codes(url(u)), [], `acceptée : ${u}`);
 });
 
 test("identifiants dans l'URL de la preuve : refusés (l'URL est conservée dans l'historique et les exports)", () => {
@@ -90,19 +90,19 @@ test("dates : future refusée ; jour inexistant refusé (pas de débordement sur
 
 test("expiration : valide au jour 180, expirée au jour 181 (limites exactes, à l'ajout ET dans le calcul du statut)", () => {
   const at = (n: number) => catalogWith([plat("p")], [ev("p", "browser", daysAgo(n))]);
-  assert.equal(stateOf(at(179), "p", NOW).status, "VERIFIED_BROWSER");
-  assert.equal(stateOf(at(180), "p", NOW).status, "VERIFIED_BROWSER", "jour 180 : encore valide");
+  assert.equal(stateOf(at(179), "p", NOW).status, "BROWSER_ONLY");
+  assert.equal(stateOf(at(180), "p", NOW).status, "BROWSER_ONLY", "jour 180 : encore valide");
   assert.equal(stateOf(at(180), "p", NOW).expiresInDays, 0, "dernier jour de validité");
   assert.equal(stateOf(at(181), "p", NOW).status, "EXPIRED", "jour 181 : expirée");
   assert.deepEqual(codes({ checkedAt: daysAgo(180) }), [], "ajout : jour 180 accepté");
   assert.deepEqual(codes({ checkedAt: daysAgo(181) }), ["TOO_OLD"], "ajout : jour 181 refusé");
   // Le même relevé, évalué à des instants différents : l'expiration suit l'horloge, pas un état enregistré.
   const c = at(170);
-  assert.equal(stateOf(c, "p", NOW + 10 * DAY).status, "VERIFIED_BROWSER");
+  assert.equal(stateOf(c, "p", NOW + 10 * DAY).status, "BROWSER_ONLY");
   assert.equal(stateOf(c, "p", NOW + 11 * DAY).status, "EXPIRED");
   // Juste avant / après minuit UTC : le jour est calendaire, pas une fenêtre glissante de 24 h.
   const d180 = Date.parse(`${daysAgo(180)}T00:00:00Z`);
-  assert.equal(stateOf(at(180), "p", d180 + 180 * DAY + DAY - 1).status, "VERIFIED_BROWSER");
+  assert.equal(stateOf(at(180), "p", d180 + 180 * DAY + DAY - 1).status, "BROWSER_ONLY");
   assert.equal(stateOf(at(180), "p", d180 + 181 * DAY).status, "EXPIRED");
 });
 
@@ -113,39 +113,39 @@ const permutations = <T,>(a: T[]): T[][] => (a.length <= 1 ? [a] : a.flatMap((x,
 const api = (file = "api"): ReturnType<typeof ev> => ev("p", "api", daysAgo(2), { source: { url: "https://developer.p.example/terms", title: "Conditions de l'API (FICTIVES)" }, file });
 const web = (file = "web"): ReturnType<typeof ev> => ev("p", "browser", daysAgo(2), { source: { url: "https://www.p.example/cgu", title: "CGU (FICTIVES)" }, file });
 
-test("une preuve API + une preuve Browser (pages officielles différentes) → VERIFIED_API_AND_BROWSER, quel que soit l'ordre", () => {
+test("une preuve API + une preuve Browser (pages officielles différentes) → API_AND_BROWSER, quel que soit l'ordre", () => {
   for (const order of permutations([api(), web()])) {
     const st = status(...order);
-    assert.equal(st.status, "VERIFIED_API_AND_BROWSER");
+    assert.equal(st.status, "API_AND_BROWSER");
     assert.deepEqual(st.channels, ["official-api", "browser"]);
   }
-  assert.equal(status(ev("p", "both")).status, "VERIFIED_API_AND_BROWSER", "une preuve « both » aussi");
-  assert.equal(status(api()).status, "VERIFIED_API", "API seule : le navigateur n'est PAS autorisé");
-  assert.equal(status(web()).status, "VERIFIED_BROWSER", "navigateur seul : l'API n'est PAS autorisée");
+  assert.equal(status(ev("p", "both")).status, "API_AND_BROWSER", "une preuve « both » aussi");
+  assert.equal(status(api()).status, "API_ONLY", "API seule : le navigateur n'est PAS autorisé");
+  assert.equal(status(web()).status, "BROWSER_ONLY", "navigateur seul : l'API n'est PAS autorisée");
 });
 
 test("une preuve plus restrictive n'est JAMAIS neutralisée par une plus permissive (toutes permutations)", () => {
   // Interdiction « human » : veto sur tout, même face à des preuves « both » plus récentes, d'autres pages, ou cumulées.
   const grants = [ev("p", "both", daysAgo(1)), api(), web(), ev("p", "browser", daysAgo(0), { source: { url: "https://www.p.example/autre", title: "Autre page" }, file: "autre" })];
-  const prohibition = ev("p", "human", daysAgo(150), { source: { url: "https://www.p.example/robots", title: "Règles robots (FICTIVES)" }, file: "human" });
+  const prohibition = ev("p", "prohibited", daysAgo(150), { source: { url: "https://www.p.example/robots", title: "Règles robots (FICTIVES)" }, file: "human" });
   for (const order of permutations([prohibition, ...grants.slice(0, 3)])) assert.equal(status(...order).status, "NOT_ALLOWED", order.map((r) => r.channel).join(","));
   assert.deepEqual(status(prohibition, ...grants).channels, []);
   // Même page officielle : le plus restrictif l'emporte (both + api → api ; both + browser → browser ; api + browser → rien).
-  const same = (ch: "both" | "api" | "browser" | "human", d: number) => ev("p", ch, daysAgo(d));
-  for (const order of permutations([same("both", 1), same("api", 3)])) assert.equal(status(...order).status, "VERIFIED_API", "both ∩ api");
-  for (const order of permutations([same("both", 1), same("browser", 3)])) assert.equal(status(...order).status, "VERIFIED_BROWSER", "both ∩ browser");
+  const same = (ch: "both" | "api" | "browser" | "prohibited", d: number) => ev("p", ch, daysAgo(d));
+  for (const order of permutations([same("both", 1), same("api", 3)])) assert.equal(status(...order).status, "API_ONLY", "both ∩ api");
+  for (const order of permutations([same("both", 1), same("browser", 3)])) assert.equal(status(...order).status, "BROWSER_ONLY", "both ∩ browser");
   for (const order of permutations([same("api", 1), same("browser", 3)])) assert.equal(status(...order).status, "NOT_ALLOWED", "contradiction sur une même page");
   // Une interdiction plus ANCIENNE (mais valide) n'est pas levée par une preuve plus récente.
-  assert.equal(status(same("human", 170), same("both", 0)).status, "NOT_ALLOWED");
-  assert.ok(status(same("human", 170), same("both", 0)).conflicts.length > 0, "la divergence est signalée");
+  assert.equal(status(same("prohibited", 170), same("both", 0)).status, "NOT_ALLOWED");
+  assert.ok(status(same("prohibited", 170), same("both", 0)).conflicts.length > 0, "la divergence est signalée");
   // Une preuve permissive EXPIRÉE n'accorde rien ; une interdiction expirée ne fait pas d'une reconsultation récente une autorisation cachée.
   assert.equal(status(ev("p", "both", daysAgo(181))).status, "EXPIRED");
-  assert.equal(status(ev("p", "both", daysAgo(181)), same("human", 2)).status, "NOT_ALLOWED");
-  assert.equal(status(same("human", 181)).status, "EXPIRED", "interdiction expirée seule : EXPIRED (jamais une autorisation)");
+  assert.equal(status(ev("p", "both", daysAgo(181)), same("prohibited", 2)).status, "NOT_ALLOWED");
+  assert.equal(status(same("prohibited", 181)).status, "EXPIRED", "interdiction expirée seule : EXPIRED (jamais une autorisation)");
 });
 
 test("NOT_ALLOWED bloque TOUJOURS l'exécution : autorisation, choix du canal, canal forcé", () => {
-  const cat = catalogWith([plat("p")], [ev("p", "both", daysAgo(1)), api(), ev("p", "human", daysAgo(100), { source: { url: "https://www.p.example/robots", title: "t" }, file: "h" })]);
+  const cat = catalogWith([plat("p")], [ev("p", "both", daysAgo(1)), api(), ev("p", "prohibited", daysAgo(100), { source: { url: "https://www.p.example/robots", title: "t" }, file: "h" })]);
   assert.equal(stateOf(cat, "p", NOW).status, "NOT_ALLOWED");
   for (const ch of ["browser", "official-api"] as const) {
     const a = adapter(`p-${ch}`, { platform: "p", channel: ch });
@@ -162,19 +162,19 @@ test("champs, plateforme, sujet et canal inconnus ou déguisés → refus (casse
     const c = codes({ platform: p });
     assert.ok(c.includes("UNKNOWN_PLATFORM") || c.includes("NO_PLATFORM"), `plateforme refusée : ${JSON.stringify(p)}`);
   }
-  for (const ch of ["Browser", "BROWSER", "web", "all", "auto", "official-api", "constructor", "__proto__", "", 1, true, null, ["api"], undefined]) {
+  for (const ch of ["Browser", "BROWSER", "web", "all", "auto", "official-api", "none", "forbidden", "Human", "constructor", "__proto__", "", 1, true, null, ["api"], undefined]) {
     assert.ok(codes({ channel: ch }).includes("BAD_CHANNEL"), `canal refusé : ${JSON.stringify(ch)}`);
   }
   for (const t of ["Automation", "auto", "terms", "", 0, null, ["api"], {}]) assert.ok(codes({ topic: t }).includes("BAD_TOPIC"), `sujet refusé : ${JSON.stringify(t)}`);
   for (const v of ["oui", "", "NONE", undefined, 3]) assert.ok(codes({ topic: "api", channel: undefined, value: v }).includes("BAD_VALUE"), `valeur refusée : ${JSON.stringify(v)}`);
   for (const raw of [null, undefined, 3, "x", [], [base()], true]) assert.equal(validateEvidence(raw, { platforms: PLATFORMS, now: NOW, allowExpired: false }).issues[0]?.code, "NOT_OBJECT");
-  assert.deepEqual([...CHANNELS], ["api", "browser", "both", "human"], "la liste des canaux ne change pas sans décision explicite");
+  assert.deepEqual([...CHANNELS], ["api", "browser", "both", "human", "prohibited"], "la liste des canaux ne change pas sans décision explicite");
 });
 
 test("un fichier refusé n'autorise RIEN, même avec un canal permissif : la plateforme reste NOT_VERIFIED", () => {
   const dir = mkdtempSync(join(tmpdir(), "ev-"));
   const bad: Record<string, unknown>[] = [
-    base({ channel: "Browser" }), base({ platform: "inconnue" }), base({ status: "VERIFIED_BROWSER" }), base({ source: { url: "http://www.p.example/x", title: "t" } }),
+    base({ channel: "Browser" }), base({ platform: "inconnue" }), base({ status: "BROWSER_ONLY" }), base({ source: { url: "http://www.p.example/x", title: "t" } }),
     base({ source: { url: "https://www.evil.example/x", title: "t" } }), base({ checkedAt: daysAgo(-1) }), base({ checkedAt: "2026-02-30" }), base({ excerpt: "trop court" }),
   ];
   bad.forEach((b, i) => writeFileSync(join(dir, `bad-${i}.json`), JSON.stringify(b)));
@@ -188,7 +188,7 @@ test("un fichier refusé n'autorise RIEN, même avec un canal permissif : la pla
 test("le catalogue statique ne peut porter aucune autorisation : des champs « status/channels/verified » injectés n'ont aucun effet", () => {
   const dir = mkdtempSync(join(tmpdir(), "cat-"));
   const file = join(dir, "catalog.json");
-  writeFileSync(file, JSON.stringify({ schemaVersion: 2, platforms: [{ id: "p", name: "P", regions: ["FR"], eventTypes: ["concert"], officialHosts: ["p.example"], clues: [], status: "VERIFIED_BROWSER", channels: ["browser"], verified: true, allowedChannels: ["browser"] }] }));
+  writeFileSync(file, JSON.stringify({ schemaVersion: 2, platforms: [{ id: "p", name: "P", regions: ["FR"], eventTypes: ["concert"], officialHosts: ["p.example"], clues: [], status: "BROWSER_ONLY", channels: ["browser"], verified: true, allowedChannels: ["browser"] }] }));
   let cat: Catalog | undefined;
   try {
     cat = loadCatalog({ path: file, evidenceDir: join(dir, "vide"), now: NOW });
@@ -199,15 +199,68 @@ test("le catalogue statique ne peut porter aucune autorisation : des champs « s
   assert.throws(() => parseCatalogFile({ schemaVersion: 2, platforms: [{ id: "p" }] }), /Catalogue invalide/);
 });
 
-test("absence totale de preuve = NOT_VERIFIED, pour toute plateforme et à tout instant ; les 6 statuts sont les seuls possibles", () => {
+test("absence totale de preuve = NOT_VERIFIED, pour toute plateforme et à tout instant ; les 7 statuts sont les seuls possibles", () => {
   const cat = catalogWith([plat("p"), plat("q")]);
   for (const t of [NOW, 0, NOW + 10_000 * DAY]) for (const id of ["p", "q"]) {
     const st = stateOf(cat, id, t);
     assert.equal(st.status, "NOT_VERIFIED");
     assert.deepEqual(st.channels, []);
   }
-  assert.deepEqual([...STATUSES], ["NOT_VERIFIED", "VERIFIED_API", "VERIFIED_BROWSER", "VERIFIED_API_AND_BROWSER", "NOT_ALLOWED", "EXPIRED"]);
+  assert.deepEqual([...STATUSES], ["NOT_VERIFIED", "API_ONLY", "BROWSER_ONLY", "API_AND_BROWSER", "HUMAN_ONLY", "EXPIRED", "NOT_ALLOWED"]);
   assert.equal(stateOf(cat, "inconnue", NOW).status, "NOT_VERIFIED", "plateforme absente du catalogue : jamais autorisée");
   // Preuves d'une AUTRE plateforme : aucun effet.
   assert.equal(stateOf(catalogWith([plat("p"), plat("q")], [ev("q", "both")]), "p", NOW).status, "NOT_VERIFIED");
+});
+
+// ───────────────────────────── phase B : URL stricte, historique, aucune preuve inventée ─────────────────────────────
+test("URL de preuve : fragment refusé ; query refusée sauf paramètres EXPLICITEMENT déclarés dans le catalogue ; lien de redirection/suivi refusé", () => {
+  assert.ok(codes(url("https://www.p.example/cgu#article-4")).includes("FRAGMENT_IN_URL"));
+  assert.ok(codes(url("https://www.p.example/cgu#")).includes("FRAGMENT_IN_URL"), "fragment vide");
+  for (const u of ["https://www.p.example/cgu?lang=fr", "https://www.p.example/cgu?", "https://www.p.example/cgu?a=1&b=2", "https://www.p.example/cgu?url=https://evil.example"]) {
+    assert.ok(codes(url(u)).includes("QUERY_IN_URL"), u);
+  }
+  // nécessité explicitement définie : la plateforme déclare le paramètre ; les autres restent refusés
+  const withLang = [{ id: "p", officialHosts: ["p.example"], allowedQueryParams: ["lang"] }];
+  const c = (u: string) => validateEvidence(base(url(u)), { platforms: withLang, now: NOW, allowExpired: false }).issues.map((i) => i.code);
+  assert.deepEqual(c("https://www.p.example/cgu?lang=fr"), []);
+  assert.ok(c("https://www.p.example/cgu?lang=fr&utm_source=x").includes("QUERY_IN_URL"));
+  assert.ok(c("https://www.p.example/cgu?next=https://evil.example").includes("QUERY_IN_URL"));
+  for (const u of ["https://www.p.example/redirect/abc", "https://www.p.example/out/abc", "https://www.p.example/go/abc", "https://www.p.example/r/abc", "https://www.p.example/l/abc", "https://www.p.example/click/abc", "https://www.p.example/tracking/abc", "https://www.p.example/cgu/link/42", "https://www.p.example/url/x"]) {
+    assert.ok(codes(url(u)).includes("REDIRECT_LIKE_URL"), u);
+  }
+  for (const u of ["https://www.p.example/conditions-generales", "https://www.p.example/legal/terms", "https://www.p.example/goals", "https://www.p.example/outdoor", "https://developer.p.example/api/terms"]) assert.deepEqual(codes(url(u)), [], `faux positif : ${u}`);
+});
+
+test("historique CONSERVÉ : une preuve expirée reste dans l'historique après expiration et après une nouvelle preuve ; rien n'est supprimé ni écrasé", () => {
+  const old = ev("p", "browser", daysAgo(200), { file: "old.json", note: "CGU 2025" });
+  const fresh = ev("p", "both", daysAgo(2), { file: "new.json", note: "CGU 2026" });
+  const st = stateOf(catalogWith([plat("p")], [old, fresh]), "p", NOW);
+  assert.deepEqual(st.history.map((h) => [h.file, h.expired]), [["new.json", false], ["old.json", true]]);
+  assert.equal(st.history.find((h) => h.file === "old.json")!.note, "CGU 2025");
+  assert.equal(st.status, "API_AND_BROWSER");
+  // l'expiration n'efface rien non plus
+  const later = stateOf(catalogWith([plat("p")], [old, fresh]), "p", NOW + 400 * DAY);
+  assert.equal(later.history.length, 2);
+  assert.equal(later.status, "EXPIRED");
+});
+
+test("aucune preuve n'est INVENTÉE : le dépôt n'en contient aucune, aucun code ne les écrit hors `platform add` (fichier fourni), le chargement est en lecture seule", () => {
+  assert.deepEqual(readdirSync("platforms/evidence").sort(), ["README.md"], "le dépôt ne livre aucune preuve");
+  const writers = (function walk(dir: string): string[] {
+    return readdirSync(dir).flatMap((f) => {
+      const p = join(dir, f);
+      return statSync(p).isDirectory() ? walk(p) : p.endsWith(".ts") && /writeFileSync|copyFileSync|renameSync|appendFileSync|createWriteStream|\.writeFile\(/.test(readFileSync(p, "utf8")) ? [p] : [];
+    });
+  })("src").sort();
+  // chaque fichier qui écrit sur disque : journaux, télémétrie, verrous, cache de sélecteurs, dépôt d'une preuve fournie
+  assert.deepEqual(writers, ["src/cli/platform.ts", "src/selectors/resolver.ts", "src/telemetry/Telemetry.ts", "src/utils/lock.ts", "src/utils/logger.ts"]);
+  const platformCli = readFileSync("src/cli/platform.ts", "utf8");
+  assert.equal([...platformCli.matchAll(/copyFileSync\(/g)].length, 1, "un seul dépôt : la copie du fichier FOURNI par l'utilisateur, après validation");
+  assert.ok(!/writeFileSync|fetch\(|node:https?|XMLHttpRequest|WebSocket/.test(platformCli.replace(/^\s*\/\/.*$/gm, "")), "platform ne fabrique ni ne télécharge de preuve");
+  const dir = mkdtempSync(join(tmpdir(), "ro-"));
+  writeFileSync(join(dir, "x.json"), JSON.stringify(base()));
+  const before = readdirSync(dir).sort();
+  loadEvidence(dir, PLATFORMS, NOW);
+  loadEvidence(dir, PLATFORMS, NOW);
+  assert.deepEqual(readdirSync(dir).sort(), before, "le chargement n'écrit rien");
 });

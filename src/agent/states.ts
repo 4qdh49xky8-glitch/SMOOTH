@@ -21,6 +21,10 @@ export const State = {
   BLOCKED: "BLOCKED",
   /** Billets au panier : le bot s'arrête avant le paiement. */
   CART_SUCCESS: "CART_SUCCESS",
+  /** Une étape est confiée à l'humain sans cause plus précise (reprise manuelle, vérification à la main). */
+  MANUAL_INTERVENTION: "MANUAL_INTERVENTION",
+  /** L'autorisation de la plateforme a expiré ou a été retirée pendant le run : arrêt, plus aucune requête. */
+  AUTHORIZATION_EXPIRED: "AUTHORIZATION_EXPIRED",
   /** Erreur technique ou délai dépassé (voir FailureReason). */
   ERROR: "ERROR",
 } as const;
@@ -42,6 +46,8 @@ export const STATE_DESCRIPTIONS: Record<State, string> = {
   PURCHASE_LIMIT: "Limite d'achat atteinte — arrêt définitif",
   BLOCKED: "Contrôle anti-bot / accès refusé — l'humain traite",
   CART_SUCCESS: "Billets au panier — paiement manuel",
+  MANUAL_INTERVENTION: "Intervention humaine (reprise manuelle)",
+  AUTHORIZATION_EXPIRED: "Autorisation expirée ou retirée — arrêt, aucune requête de plus",
   ERROR: "Erreur technique ou délai dépassé",
 };
 
@@ -62,6 +68,8 @@ export type FailureReason =
   | "CART_UNVERIFIED"
   | "SELECTOR_NOT_FOUND"
   | "RATE_LIMITED"
+  | "AUTHORIZATION_EXPIRED"
+  | "LOCK_LOST"
   | "ADAPTER_ERROR";
 
 export const reasonForState = (s: BlockingState): FailureReason => s;

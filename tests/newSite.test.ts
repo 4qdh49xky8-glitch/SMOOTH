@@ -58,13 +58,13 @@ test("plateforme NOT_VERIFIED / EXPIRED / absente : squelette EXPLICITEMENT marq
   }
 });
 
-test("plateforme VERIFIED_BROWSER : squelette navigateur UTILISABLE — autorisation, canal et preuve pré-remplis, contrat satisfait", async () => {
+test("plateforme BROWSER_ONLY : squelette navigateur UTILISABLE — autorisation, canal et preuve pré-remplis, contrat satisfait", async () => {
   const cat = catalogWith([plat("mon-site")], [ev("mon-site", "browser", daysAgo(5), { authorization: 'Les CGU "autorisent" l\'automatisation.' })]);
   const plan = planNewSite(cat, "mon-site", "Mon Site", { now: NOW });
   assert.equal(plan.kind, "skeleton");
   if (plan.kind !== "skeleton") return;
   assert.equal(plan.verified, true);
-  assert.equal(plan.status, "VERIFIED_BROWSER");
+  assert.equal(plan.status, "BROWSER_ONLY");
   const src = plan.files["src/sites/MonSite.ts"]!;
   assert.match(src, /@skeleton-status VERIFIED/);
   assert.doesNotMatch(src, /TODO\(COMPLIANCE\)/);
@@ -78,12 +78,12 @@ test("plateforme VERIFIED_BROWSER : squelette navigateur UTILISABLE — autorisa
   assert.match(plan.notes[0]!, /preuve du/);
 });
 
-test("plateforme VERIFIED_API : squelette API (BaseApiAdapter, sans navigateur, secret par variable d'environnement, pas de paiement)", async () => {
+test("plateforme API_ONLY : squelette API (BaseApiAdapter, sans navigateur, secret par variable d'environnement, pas de paiement)", async () => {
   const cat = catalogWith([plat("mon-site")], [ev("mon-site", "api", daysAgo(5))]);
   const plan = planNewSite(cat, "mon-site", "Mon Site", { now: NOW });
   assert.equal(plan.kind, "skeleton");
   if (plan.kind !== "skeleton") return;
-  assert.equal(plan.status, "VERIFIED_API");
+  assert.equal(plan.status, "API_ONLY");
   const src = plan.files["src/sites/MonSite.ts"]!;
   assert.match(src, /extends BaseApiAdapter/);
   assert.match(src, /channel: "official-api"/);
@@ -100,12 +100,16 @@ test("canal demandé non autorisé, ou plateforme NOT_ALLOWED : AUCUN fichier n'
   const p1 = planNewSite(onlyApi, "mon-site", "Mon Site", { channel: "browser", now: NOW });
   assert.equal(p1.kind, "refused");
   assert.match((p1 as { message: string }).message, /canal « browser » n'est pas autorisé/);
-  const notAllowed = catalogWith([plat("mon-site")], [ev("mon-site", "human", daysAgo(5))]);
-  const p2 = planNewSite(notAllowed, "mon-site", "Mon Site", { now: NOW });
-  assert.equal(p2.kind, "refused");
-  assert.match((p2 as { message: string }).message, /NOT_ALLOWED[\s\S]*rien n'a été créé/);
+  for (const [channel, status] of [["prohibited", "NOT_ALLOWED"], ["human", "HUMAN_ONLY"]] as const) {
+    const cat = catalogWith([plat("mon-site")], [ev("mon-site", channel, daysAgo(5))]);
+    for (const wanted of [undefined, "api", "browser"] as const) {
+      const p2 = planNewSite(cat, "mon-site", "Mon Site", { now: NOW, channel: wanted });
+      assert.equal(p2.kind, "refused", `${status} / ${wanted}`);
+      assert.match((p2 as { message: string }).message, new RegExp(`${status}[\\s\\S]*rien n'a été créé`));
+    }
+  }
   const both = catalogWith([plat("mon-site")], [ev("mon-site", "both", daysAgo(5))]);
-  assert.equal((planNewSite(both, "mon-site", "Mon Site", { channel: "api", now: NOW }) as { status: string }).status, "VERIFIED_API_AND_BROWSER");
+  assert.equal((planNewSite(both, "mon-site", "Mon Site", { channel: "api", now: NOW }) as { status: string }).status, "API_AND_BROWSER");
   assert.match((planNewSite(both, "mon-site", "Mon Site", { now: NOW }) as { files: Record<string, string> }).files["src/sites/MonSite.ts"]!, /extends BaseApiAdapter/, "sans --channel : l'API d'abord");
   assert.match((planNewSite(both, "mon-site", "Mon Site", { channel: "browser", now: NOW }) as { files: Record<string, string> }).files["src/sites/MonSite.ts"]!, /extends BaseSiteAdapter/);
 });

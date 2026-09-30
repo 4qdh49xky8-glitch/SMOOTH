@@ -117,6 +117,11 @@ export interface AdapterContext {
  *  - aucune méthode ne doit déclencher un paiement.
  */
 export interface SiteAdapter {
+  /**
+   * Hôtes que cet adaptateur contactera en dehors de la page d'événement (API officielle, service de file…). Le cœur vérifie
+   * qu'ils appartiennent TOUS aux domaines officiels de la plateforme (catalogue) avant tout contact.
+   */
+  networkHosts?(config: BotConfig): string[];
   readonly meta: AdapterMeta;
   /** URLs de paiement : bloquées pendant l'exécution du bot (garde-fou). */
   readonly paymentUrlPatterns: RegExp[];

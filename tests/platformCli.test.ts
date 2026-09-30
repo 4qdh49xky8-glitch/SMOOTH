@@ -64,7 +64,7 @@ test("platform verify : plateforme vérifiée (échéance), proche de l'expirati
     ev("conflit", "both", daysAgo(9)), ev("conflit", "api", daysAgo(3)),
   ]);
   const ok = (await run({ sub: "verify", target: "ok", json: false, catalog: cat })).out;
-  assert.match(ok, /Statut : VERIFIED_API_AND_BROWSER/);
+  assert.match(ok, /Statut : API_AND_BROWSER/);
   assert.match(ok, /Expire le \d{4}-\d{2}-\d{2} \(dans 170 j\)/);
   assert.ok(!ok.includes("BLOQUANT"), "l'automatisation est prouvée : plus rien de bloquant");
   assert.doesNotMatch(ok, /complémentaire\s+queue /, "la file d'attente est déjà documentée");
@@ -89,7 +89,7 @@ test("platform template : modèle volontairement INVALIDE tant que les champs ne
     assert.ok(v.issues.length > 0, `le modèle ${topic} ne doit pas être valide tel quel`);
     assert.ok(v.issues.some((i) => ["NO_DATE", "NO_HTTPS_URL", "NO_EXCERPT", "BAD_CHANNEL", "BAD_VALUE"].includes(i.code)));
   }
-  assert.deepEqual(evidenceTemplate("p").channel, "api | browser | both | human");
+  assert.deepEqual(evidenceTemplate("p").channel, "api | browser | both | human | prohibited");
   assert.equal((await run({ sub: "template", target: "inconnue", json: false, catalog: cat })).code, 1);
   assert.equal((await run({ sub: "template", target: "p", topic: "magie", json: false, catalog: cat })).code, 1);
 });
@@ -126,7 +126,7 @@ test("platform add : range une preuve valide (nom normalisé, statut recalculé)
   const src = write(dir(), "brouillon.json", valid({ channel: "both" }));
   const r = await run({ sub: "add", target: src, json: false, catalog: cat, evidenceDir: join(d, "evidence") });
   assert.equal(r.code, 0);
-  assert.match(r.out, /Statut de p : VERIFIED_API_AND_BROWSER \(expire le /);
+  assert.match(r.out, /Statut de p : API_AND_BROWSER \(expire le /);
   assert.deepEqual(readdirSync(join(d, "evidence")), [`p-${TODAY}.json`]);
   assert.deepEqual(JSON.parse(readFileSync(join(d, "evidence", `p-${TODAY}.json`), "utf8")), valid({ channel: "both" }), "le contenu est copié tel quel, sans réécriture");
   // doublon
@@ -159,7 +159,7 @@ test("platform history : date, URL, source, canal, expiration, note", async () =
   assert.match(r.out, /EXPIRÉE/);
   const j = JSON.parse((await run({ sub: "history", target: "p", json: true, catalog: cat })).out);
   assert.equal(j.history.length, 2);
-  assert.equal(j.status, "VERIFIED_API_AND_BROWSER");
+  assert.equal(j.status, "API_AND_BROWSER");
   assert.equal((await run({ sub: "history", target: "inconnue", json: false, catalog: cat })).code, 1);
   assert.equal((await run({ sub: "nimporte", json: false, catalog: cat })).code, 1);
   assert.equal((await run({ json: false, catalog: cat })).code, 0, "sans sous-commande : aide");

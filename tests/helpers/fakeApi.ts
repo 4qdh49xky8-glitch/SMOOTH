@@ -67,7 +67,7 @@ export class FakeApiAdapter extends BaseApiAdapter {
   private selected?: Offer;
   constructor(fetchImpl: typeof fetch, env: NodeJS.ProcessEnv = { P_API_KEY: "SECRET-CANARY-1234567890abcdef" }, minIntervalMs = 200) {
     super();
-    this.client = new ApiClient({ baseUrl: "https://api.p.example/v1", auth: { envVar: "P_API_KEY" }, fetchImpl, env, minIntervalMs });
+    this.client = new ApiClient({ allowedHosts: ["api.p.example"], baseUrl: "https://api.p.example/v1", auth: { envVar: "P_API_KEY" }, fetchImpl, env, minIntervalMs });
   }
   async authenticate(): Promise<void> {
     await this.client.request("GET", "/me");

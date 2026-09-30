@@ -8,8 +8,15 @@ import { join } from "node:path";
 export const EVIDENCE_MAX_AGE_DAYS = 180;
 export const EVIDENCE_DIR = "platforms/evidence";
 
-/** api : l'API officielle est autorisée · browser : l'automatisation de l'interface l'est · both : les deux · human : ni l'une ni l'autre (achat humain seulement). */
-export const CHANNELS = ["api", "browser", "both", "human"] as const;
+/**
+ * Ce que la source officielle dit de l'automatisation :
+ *  api       l'API officielle est autorisée (le navigateur n'est PAS autorisé par cette preuve)
+ *  browser   l'automatisation de l'interface est autorisée (l'API n'est PAS autorisée par cette preuve)
+ *  both      les deux
+ *  human     seule l'intervention humaine est possible (rappels, achat à la main) → statut HUMAN_ONLY
+ *  prohibited la source INTERDIT l'automatisation → statut NOT_ALLOWED
+ */
+export const CHANNELS = ["api", "browser", "both", "human", "prohibited"] as const;
 export type EvidenceChannel = (typeof CHANNELS)[number];
 
 /** automation décide de l'autorisation ; les autres sujets documentent (API, file d'attente, limites d'achat, panier). */
@@ -44,7 +51,7 @@ export interface EvidenceRecord {
 
 export type IssueCode =
   | "INVALID_JSON" | "NOT_OBJECT" | "UNKNOWN_FIELD" | "NO_PLATFORM" | "UNKNOWN_PLATFORM" | "NO_DATE" | "FUTURE_DATE" | "TOO_OLD"
-  | "NO_SOURCE" | "NO_HTTPS_URL" | "CREDENTIALS_IN_URL" | "NO_TITLE" | "DOMAIN_MISMATCH" | "NO_EXCERPT" | "NO_AUTHORIZATION" | "BAD_TOPIC" | "BAD_CHANNEL" | "BAD_VALUE";
+  | "NO_SOURCE" | "NO_HTTPS_URL" | "CREDENTIALS_IN_URL" | "FRAGMENT_IN_URL" | "QUERY_IN_URL" | "REDIRECT_LIKE_URL" | "NO_TITLE" | "DOMAIN_MISMATCH" | "NO_EXCERPT" | "NO_AUTHORIZATION" | "BAD_TOPIC" | "BAD_CHANNEL" | "BAD_VALUE";
 
 export interface EvidenceIssue {
   code: IssueCode;
@@ -81,7 +88,12 @@ const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
 export interface PlatformRef {
   id: string;
   officialHosts: string[];
+  /** Noms de paramètres de requête explicitement tolérés dans l'URL d'une preuve (défaut : aucun — toute query est refusée). */
+  allowedQueryParams?: string[];
 }
+
+/** Segments de chemin typiques d'un redirecteur / traqueur de liens : une redirection n'est jamais une preuve. */
+const REDIRECTOR = /(^|\/)(redirect|redir|goto|go|out|away|exit|r|l|click|track|tracking|link|url|jump|forward|rd)(\/|$)/i;
 
 /** L'hôte de l'URL doit être un domaine officiel de la plateforme (ou l'un de ses sous-domaines). */
 export const hostMatches = (url: string, hosts: string[]): boolean => {
@@ -134,6 +146,13 @@ export function validateEvidence(raw: unknown, o: ValidateOptions): ValidationRe
     parsed = undefined;
   }
   if (source && (!parsed || parsed.protocol !== "https:")) add("NO_HTTPS_URL", "« source.url » doit être une URL https");
+  if (parsed && url.includes("#")) add("FRAGMENT_IN_URL", "« source.url » ne doit pas contenir de fragment (#…) : citez la page, pas un point d'ancrage");
+  if (parsed && url.includes("?")) {
+    const allowed = new Set(platform?.allowedQueryParams ?? []);
+    const extra = [...new Set([...parsed.searchParams.keys()])].filter((k) => !allowed.has(k));
+    if (extra.length || !parsed.search.slice(1)) add("QUERY_IN_URL", `« source.url » ne doit pas contenir de paramètres de requête (${extra.join(", ") || "?"}) sauf nécessité déclarée dans le catalogue (allowedQueryParams)`);
+  }
+  if (parsed && REDIRECTOR.test(parsed.pathname)) add("REDIRECT_LIKE_URL", "« source.url » ressemble à un lien de redirection/suivi : une redirection n'est pas une preuve, citez l'URL finale de la page lue");
   if (parsed && (parsed.username || parsed.password)) add("CREDENTIALS_IN_URL", "« source.url » ne doit contenir aucun identifiant (utilisateur:mot de passe@) : l'URL est conservée dans l'historique");
   if (source && !str(source.title)) add("NO_TITLE", "« source.title » (titre de la page officielle) manquant");
   if (platform && parsed?.protocol === "https:" && !hostMatches(url, platform.officialHosts))

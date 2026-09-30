@@ -5,7 +5,7 @@ import { redact, trackSecretEnv } from "../utils/redact.js";
 
 /**
  * Client HTTP pour les API OFFICIELLES documentées. Il n'est utilisé que par un adaptateur dont la plateforme est au
- * statut VERIFIED_API / VERIFIED_API_AND_BROWSER (preuve officielle valide). Garanties, non désactivables :
+ * statut API_ONLY / API_AND_BROWSER (preuve officielle valide). Garanties, non désactivables :
  *  - https uniquement, et l'hôte est verrouillé sur `baseUrl` (aucune requête vers un autre domaine, redirections refusées) ;
  *  - le secret vient d'une VARIABLE D'ENVIRONNEMENT nommée : jamais dans le code, la config, les logs ni les erreurs ;
  *  - cadence plafonnée (≥ 200 ms entre deux requêtes) ; 429/Retry-After respecté (jamais contourné) ;
@@ -20,6 +20,8 @@ export interface ApiResponse<T = unknown> {
 export interface ApiClientOptions {
   /** Base https de l'API officielle documentée (ex. `https://api.exemple-officiel.fr/v1`). */
   baseUrl: string;
+  /** Liste d'hôtes autorisés (OBLIGATOIRE, non vide) : l'hôte de baseUrl doit y figurer. Le cœur vérifie en outre qu'ils sont officiels (catalogue). */
+  allowedHosts: string[];
   /** Nom de la variable d'environnement qui contient le secret, et façon de l'envoyer. */
   auth?: { envVar: string; header?: string; scheme?: "Bearer" | "raw" };
   /** Intervalle minimal entre deux requêtes (≥ 200 ms). */
@@ -114,6 +116,8 @@ export class ApiClient {
     }
     if (base.protocol !== "https:") throw new Error("ApiClient : baseUrl doit être en https");
     if (base.username || base.password) throw new Error("ApiClient : pas d'identifiants dans l'URL (utilisez auth.envVar)");
+    if (!Array.isArray(o.allowedHosts) || o.allowedHosts.length === 0) throw new Error("ApiClient : allowedHosts est obligatoire (liste d'hôtes autorisés)");
+    if (!o.allowedHosts.map((h) => h.toLowerCase()).includes(base.hostname.toLowerCase())) throw new Error(`ApiClient : l'hôte ${base.hostname} n'est pas dans allowedHosts`);
     if (base.search || base.hash) throw new Error("ApiClient : baseUrl sans paramètres ni ancre");
     this.base = base;
     trackSecretEnv(o.auth?.envVar);
@@ -121,6 +125,11 @@ export class ApiClient {
     this.env = o.env ?? process.env;
     this.log = o.log ?? silentLogger;
     this.minInterval = Math.max(200, o.minIntervalMs ?? 400);
+  }
+
+  /** Hôtes que ce client peut contacter (un seul : celui de baseUrl). */
+  get hosts(): string[] {
+    return [this.base.hostname];
   }
 
   /** Requêtes séquentielles espacées d'au moins `minIntervalMs` : aucun martèlement, même appelé en parallèle. */

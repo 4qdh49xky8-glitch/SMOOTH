@@ -25,8 +25,8 @@ Sommaire : [0. Autorisation](#0-avant-tout-code--lautorisation-bloquant) · [1. 
 
 **La décision se consigne d'abord sous forme de preuve** : un fichier `platforms/evidence/<plateforme>-<date>.json`
 (URL HTTPS sur un domaine officiel de la plateforme, date de lecture, extrait cité, canal autorisé ; voir
-[PLATFORMS.md](PLATFORMS.md)). Le statut (`NOT_VERIFIED`, `VERIFIED_API`, `VERIFIED_BROWSER`, `VERIFIED_API_AND_BROWSER`,
-`NOT_ALLOWED`, `EXPIRED`) est **calculé** ; la preuve expire après 180 jours. Le cœur **refuse** tout adaptateur dont la
+[PLATFORMS.md](PLATFORMS.md)). Le statut (`NOT_VERIFIED`, `API_ONLY`, `BROWSER_ONLY`, `API_AND_BROWSER`,
+`HUMAN_ONLY`, `EXPIRED`, `NOT_ALLOWED`) est **calculé** ; la preuve expire après 180 jours. Le cœur **refuse** tout adaptateur dont la
 plateforme n'est pas vérifiée pour son canal. `npm run platform verify <plateforme>` liste les pièces manquantes ;
 `npm run platforms -- --check` refuse qu'un adaptateur existe pour une plateforme non vérifiée.
 
@@ -66,7 +66,7 @@ Crée `src/sites/MonSite.ts`, `src/selectors/mon-site.ts` et `tests/mon-site.tes
 
 - statut compatible → adaptateur utilisable (`meta.platform` / `meta.channel` renseignés) ;
 - `NOT_VERIFIED` / `EXPIRED` → **squelette marqué `@skeleton-status NOT_VERIFIED`**, non conforme, jamais lancé ;
-- `NOT_ALLOWED` → refus, aucun fichier.
+- `NOT_ALLOWED` / `HUMAN_ONLY`, ou canal non autorisé par les preuves → refus, aucun fichier.
 
 Sans `--platform`, le squelette est non conforme : les champs `TODO(COMPLIANCE)` doivent être renseignés, sinon
 `npm run test:adapters` échoue et le cœur refuse de le lancer. Vérifiez qu'il est bien découvert :
@@ -78,6 +78,22 @@ npm run sites        # une ligne par adaptateur, avec l'état du contrat (✓ OK
 Règles de découverte : le fichier est `src/sites/<Nom>.ts`, il **exporte par défaut une classe** à constructeur
 sans argument, et son `meta.id` est unique (`[a-z0-9-]+`). Les noms `SiteAdapter`, `BaseSiteAdapter`, `registry`,
 `compliance` et `contract` sont réservés à l'infrastructure.
+
+**Procédure complète d'ajout d'une plateforme** (ordre obligatoire) :
+
+1. `npm run platform verify <id>` : pièces exactes à consigner. 2. Lire **vous-même** la source officielle ; `npm run platform template <id>`,
+   remplir (URL de la page lue, date, extrait recopié, canal), `npm run platform add <fichier>`. 3. `npm run platforms` : le statut
+   doit inclure le canal voulu (sinon stop : canal humain). 4. `npm run new-site -- <id> "<Nom>" --platform <id> --channel api|browser`.
+5. Implémenter le minimum (découverte, disponibilité, offres, prix, catégorie, quantité, sélection, panier) ; **jamais** de paiement.
+6. Déclarer les hôtes : pour l'API, `new ApiClient({ allowedHosts, baseUrl, … })` et exposer `client` (le cœur vérifie que ces hôtes sont
+   dans `officialHosts`) ; pour le navigateur, `networkHosts()` si l'adaptateur contacte d'autres hôtes que la page d'événement.
+7. Fixtures locales (faux serveur / HTML) : sold-out, file, CAPTCHA, login, prix, quantité, sièges ensemble, panier incohérent,
+   autorisation, hôtes. 8. `npm run test:adapters`, `npm test`, `npm run doctor`. 9. Seulement ensuite, éventuellement, un essai réel minimal
+   — jamais sur une vente réelle sans vous — qui s'arrête à `CART_SUCCESS`.
+
+**Responsabilités de l'adaptateur** : implémentation technique d'un canal, détection des blocages (jamais leur contournement),
+déclaration honnête de `meta` (canal, prérequis, limites d'achat). Il ne décide **pas** de l'autorisation (preuves), ne choisit pas
+son canal (cœur), ne paie pas.
 
 ## 2. Métadonnées et capacités
 

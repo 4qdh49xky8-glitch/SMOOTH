@@ -6,7 +6,7 @@ import { after, before, test } from "node:test";
 import { chromium, type Browser, type Page } from "playwright";
 import { startDemoServer } from "../../demo/server.js";
 import { DIGEST_SCRIPT, sanitizeDigest, buildHealPrompt, type RawDigest } from "../../src/agent/claude.js";
-import { installPaymentGuard } from "../../src/browser/guards.js";
+import { installNetworkGuards } from "../../src/browser/guards.js";
 import { openBrowser, type BrowserSession } from "../../src/browser/launch.js";
 import { ConfigSchema } from "../../src/config/schema.js";
 import { main } from "../../src/index.js";
@@ -91,7 +91,7 @@ t("12 · deux navigateurs simultanés : ports, profils, cookies et onglets sépa
 t("18 · garde-fou de paiement : la page de paiement n'est jamais atteinte pendant le run, puis accessible à la reprise manuelle", async () => {
   const s = await openBrowser(cfg(), silentLogger, { userDataDir: join(tmp, "profil-garde") });
   sessions.push(s);
-  const release = await installPaymentGuard(s.context, new ExampleSite().paymentUrlPatterns, silentLogger, () => undefined);
+  const release = await installNetworkGuards(s.context, { paymentPatterns: new ExampleSite().paymentUrlPatterns, allowedHosts: ["127.0.0.1", "localhost"], log: silentLogger });
   const before = demo.state.paymentHits;
   await assert.rejects(s.page.goto(`${demo.url}/payment`), /ERR_FAILED|aborted|net::/);
   assert.equal(demo.state.paymentHits, before, "la requête de paiement ne doit même pas atteindre le serveur");
@@ -101,6 +101,39 @@ t("18 · garde-fou de paiement : la page de paiement n'est jamais atteinte penda
   await release();
   await s.page.goto(`${demo.url}/payment`);
   assert.equal(demo.state.paymentHits, before + 1, "après le run, le paiement manuel est possible");
+});
+
+t("garde réseau : une NAVIGATION vers un hôte hors domaines autorisés est annulée (y compris par redirection) sans atteindre le serveur ; les hôtes autorisés et les sous-ressources passent", async () => {
+  const s = await openBrowser(cfg(), silentLogger, { userDataDir: join(tmp, "profil-hotes") });
+  sessions.push(s);
+  const port = new URL(demo.url).port;
+  assert.equal(new URL(demo.url).hostname, "127.0.0.1");
+  const seen: string[] = [];
+  demo.server.on("request", (req) => void seen.push(String(req.headers.host)));
+  const blocked: string[] = [];
+  const release = await installNetworkGuards(s.context, { paymentPatterns: [], allowedHosts: ["127.0.0.1"], log: silentLogger, onBlocked: (u, why) => void blocked.push(`${why}:${new URL(u).hostname}`) });
+  // 1. navigation directe vers un autre hôte (« localhost » ≠ « 127.0.0.1 ») : annulée, le serveur ne voit rien
+  await assert.rejects(s.page.goto(`http://localhost:${port}/event`), /ERR_FAILED|aborted|net::/);
+  assert.ok(!seen.some((h) => h.startsWith("localhost")), "la requête vers l'hôte non autorisé ne doit pas partir");
+  assert.deepEqual(blocked, ["host:localhost"]);
+  // 2. l'hôte autorisé fonctionne normalement (onglet neuf : l'onglet bloqué affiche une page d'erreur du navigateur)
+  const p2 = await s.context.newPage();
+  await p2.goto(`${demo.url}/event`);
+  assert.match(p2.url(), /^http:\/\/127\.0\.0\.1:/, "navigation autorisée (le site peut rediriger vers sa propre page de connexion)");
+  // 3. une REDIRECTION de page vers un hôte non autorisé est annulée aussi (navigation déclenchée par le script de la page)
+  await p2.evaluate((target) => void (window.location.href = target), `http://localhost:${port}/event`);
+  await sleep(400);
+  assert.ok(!seen.some((h) => h.startsWith("localhost")), "redirection côté page vers un hôte non autorisé");
+  assert.ok(blocked.length >= 2);
+  // 4. les sous-ressources (fetch de la page vers un autre hôte) ne sont PAS modifiées : le garde ne réécrit pas le fonctionnement du site
+  const p3 = await s.context.newPage();
+  await p3.goto(`${demo.url}/event`);
+  await p3.evaluate((u) => fetch(u, { mode: "no-cors" }).catch(() => undefined), `http://localhost:${port}/event/offers/none`);
+  await sleep(200);
+  assert.ok(seen.some((h) => h.startsWith("localhost")), "une sous-ressource suit le fonctionnement normal du site (non interceptée)");
+  await release();
+  const p4 = await s.context.newPage();
+  await p4.goto(`http://localhost:${port}/event`); // garde levé : navigation possible
 });
 
 t("18 · de bout en bout (vrai navigateur) : panier obtenu, puis arrêt — la page de paiement n'est jamais demandée", async () => {

@@ -1,4 +1,6 @@
-import type { AdapterMeta } from "../sites/SiteAdapter.js";
+import type { BotConfig } from "../config/schema.js";
+import type { AdapterMeta, SiteAdapter } from "../sites/SiteAdapter.js";
+import { hostMatches } from "./evidence.js";
 import { findPlatform, stateOf, type Catalog, type PlatformStatus } from "./catalog.js";
 
 /** Canal technique d'un adaptateur : API officielle ou pilotage du navigateur. */
@@ -38,4 +40,32 @@ export function authorizeAdapter(meta: AdapterMeta, catalog: Catalog, now = Date
 export function assertAuthorized(meta: AdapterMeta, catalog: Catalog, now = Date.now()): void {
   const a = authorizeAdapter(meta, catalog, now);
   if (!a.ok) throw new Error(`Adaptateur « ${meta.id} » refusé : ${a.reason}`);
+}
+
+const LOCAL = ["127.0.0.1", "localhost", "::1", "[::1]"];
+
+/**
+ * Autorisation → hôte autorisé → adaptateur → réseau. Aucune configuration utilisateur ne doit mener au réseau sans passer ici :
+ * l'URL de l'événement ET chaque hôte déclaré par l'adaptateur doivent appartenir aux domaines officiels de la plateforme
+ * (catalogue), ou, pour l'adaptateur de démonstration, à la boucle locale.
+ */
+export function allowedHosts(meta: AdapterMeta, catalog: Catalog): string[] {
+  if (meta.compliance.policy === "demo") return LOCAL;
+  return findPlatform(catalog, platformOf(meta))?.officialHosts ?? [];
+}
+
+export function assertNetworkAllowed(adapter: SiteAdapter, config: BotConfig, catalog: Catalog): void {
+  const hosts = allowedHosts(adapter.meta, catalog);
+  const check = (what: string, raw: string): void => {
+    let ok = false;
+    try {
+      const u = new URL(raw);
+      ok = (u.protocol === "https:" || (adapter.meta.compliance.policy === "demo" && u.protocol === "http:")) && hostMatches(raw, hosts);
+    } catch {
+      ok = false;
+    }
+    if (!ok) throw new Error(`Adaptateur « ${adapter.meta.id} » refusé : ${what} hors des domaines autorisés pour « ${platformOf(adapter.meta)} » (${hosts.join(", ") || "aucun"}) — aucune requête n'a été émise`);
+  };
+  check("l'URL de l'événement", adapter.resolveEventUrl(config));
+  for (const h of adapter.networkHosts?.(config) ?? []) check(`l'hôte « ${h} »`, `https://${h}/`);
 }

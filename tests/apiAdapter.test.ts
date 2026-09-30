@@ -16,15 +16,15 @@ import { NOW, catalogWith, daysAgo, ev, plat } from "./helpers/platformFixtures.
 
 const SECRET = "SECRET-CANARY-1234567890abcdef";
 const client = (fetchImpl: typeof fetch, over: Record<string, unknown> = {}): ApiClient =>
-  new ApiClient({ baseUrl: "https://api.p.example/v1", auth: { envVar: "P_API_KEY" }, env: { P_API_KEY: SECRET }, fetchImpl, minIntervalMs: 200, ...over });
+  new ApiClient({ allowedHosts: ["api.p.example"], baseUrl: "https://api.p.example/v1", auth: { envVar: "P_API_KEY" }, env: { P_API_KEY: SECRET }, fetchImpl, minIntervalMs: 200, ...over });
 const res = (status: number, body?: unknown, headers: Record<string, string> = {}): ApiResponse => ({ status, headers, body });
 
 // ───────────────────────────── ApiClient : garde-fous non désactivables ─────────────────────────────
 test("ApiClient : https seulement, pas d'identifiants dans l'URL, chemins relatifs à baseUrl, pas de sortie du préfixe ni du domaine", async () => {
   const { fetchImpl, state } = fakeApi();
-  assert.throws(() => new ApiClient({ baseUrl: "http://api.p.example/v1", fetchImpl }), /https/);
-  assert.throws(() => new ApiClient({ baseUrl: "pas une url", fetchImpl }), /invalide/);
-  assert.throws(() => new ApiClient({ baseUrl: "https://user:pass@api.p.example/v1", fetchImpl }), /identifiants/);
+  assert.throws(() => new ApiClient({ allowedHosts: ["api.p.example"], baseUrl: "http://api.p.example/v1", fetchImpl }), /https/);
+  assert.throws(() => new ApiClient({ allowedHosts: ["api.p.example"], baseUrl: "pas une url", fetchImpl }), /invalide/);
+  assert.throws(() => new ApiClient({ allowedHosts: ["api.p.example"], baseUrl: "https://user:pass@api.p.example/v1", fetchImpl }), /identifiants/);
   const c = client(fetchImpl);
   for (const bad of ["me", "//evil.example/x", "https://evil.example/x", "/ok://x", "/../admin", "/../../etc"]) {
     await assert.rejects(c.request("GET", bad), /refusé|attendu/, bad);

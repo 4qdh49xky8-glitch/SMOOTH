@@ -104,10 +104,10 @@ test("le dossier de preuves : valides chargées, invalides REFUSÉES et signalé
 test("les six statuts, déduits UNIQUEMENT des preuves", () => {
   const status = (records = [] as ReturnType<typeof ev>[], now = NOW): PlatformStatus => stateOf(catalogWith([plat("p")], records), "p", now).status;
   assert.equal(status(), "NOT_VERIFIED");
-  assert.equal(status([ev("p", "api")]), "VERIFIED_API");
-  assert.equal(status([ev("p", "browser")]), "VERIFIED_BROWSER");
-  assert.equal(status([ev("p", "both")]), "VERIFIED_API_AND_BROWSER");
-  assert.equal(status([ev("p", "human")]), "NOT_ALLOWED");
+  assert.equal(status([ev("p", "api")]), "API_ONLY");
+  assert.equal(status([ev("p", "browser")]), "BROWSER_ONLY");
+  assert.equal(status([ev("p", "both")]), "API_AND_BROWSER");
+  assert.equal(status([ev("p", "prohibited")]), "NOT_ALLOWED");
   assert.equal(status([ev("p", "both", daysAgo(181))]), "EXPIRED");
   // des preuves documentaires seules ne vérifient rien
   assert.equal(status([fact("p", "api", "open-transactional"), fact("p", "queue", "none")]), "NOT_VERIFIED");
@@ -115,8 +115,8 @@ test("les six statuts, déduits UNIQUEMENT des preuves", () => {
 
 test("expiration AUTOMATIQUE après 180 jours : la même preuve autorise, puis n'autorise plus", () => {
   const cat = catalogWith([plat("p")], [ev("p", "both", TODAY)]);
-  assert.equal(stateOf(cat, "p", NOW).status, "VERIFIED_API_AND_BROWSER");
-  assert.equal(stateOf(cat, "p", NOW + 180 * DAY).status, "VERIFIED_API_AND_BROWSER", "dernier jour de validité");
+  assert.equal(stateOf(cat, "p", NOW).status, "API_AND_BROWSER");
+  assert.equal(stateOf(cat, "p", NOW + 180 * DAY).status, "API_AND_BROWSER", "dernier jour de validité");
   const later = stateOf(cat, "p", NOW + 181 * DAY);
   assert.equal(later.status, "EXPIRED");
   assert.deepEqual(later.channels, []);
@@ -128,11 +128,11 @@ test("expiration AUTOMATIQUE après 180 jours : la même preuve autorise, puis n
 
 test("preuves multiples : la plus restrictive l'emporte ; la nouvelle preuve remplace l'expirée ; échéance = la plus proche", () => {
   const s = (records: ReturnType<typeof ev>[]) => stateOf(catalogWith([plat("p")], records), "p", NOW);
-  assert.equal(s([ev("p", "both"), ev("p", "api", daysAgo(3))]).status, "VERIFIED_API", "intersection both ∩ api");
+  assert.equal(s([ev("p", "both"), ev("p", "api", daysAgo(3))]).status, "API_ONLY", "intersection both ∩ api");
   assert.ok(s([ev("p", "both"), ev("p", "api", daysAgo(3))]).conflicts.length > 0, "divergence signalée");
   assert.equal(s([ev("p", "api"), ev("p", "browser", daysAgo(3))]).status, "NOT_ALLOWED", "aucun canal commun");
-  assert.equal(s([ev("p", "both", daysAgo(10)), ev("p", "human", daysAgo(2))]).status, "NOT_ALLOWED", "une interdiction récente prime");
-  assert.equal(s([ev("p", "browser", daysAgo(200)), ev("p", "browser", daysAgo(5))]).status, "VERIFIED_BROWSER", "le relevé récent remplace l'expiré");
+  assert.equal(s([ev("p", "both", daysAgo(10)), ev("p", "prohibited", daysAgo(2))]).status, "NOT_ALLOWED", "une interdiction récente prime");
+  assert.equal(s([ev("p", "browser", daysAgo(200)), ev("p", "browser", daysAgo(5))]).status, "BROWSER_ONLY", "le relevé récent remplace l'expiré");
   assert.equal(s([ev("p", "browser", daysAgo(170)), ev("p", "browser", daysAgo(5))]).expiresAt, expiresAt(daysAgo(170)), "échéance la plus proche");
 });
 

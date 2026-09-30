@@ -1,5 +1,5 @@
 import { channelOf, platformOf } from "../platforms/authorize.js";
-import { checkCatalogIntegrity, loadCatalog, stateOf, type Catalog, type Platform, type PlatformState } from "../platforms/catalog.js";
+import { AUTOMATABLE, STATUSES, checkCatalogIntegrity, loadCatalog, stateOf, type Catalog, type Platform, type PlatformState } from "../platforms/catalog.js";
 import { EVIDENCE_MAX_AGE_DAYS } from "../platforms/evidence.js";
 import { discoverAdapters } from "../sites/registry.js";
 
@@ -22,7 +22,7 @@ export function exportCatalog(catalog: Catalog, adapters: { id: string; platform
     schemaVersion: EXPORT_SCHEMA_VERSION,
     generatedAt: new Date(now).toISOString(),
     evidenceMaxAgeDays: EVIDENCE_MAX_AGE_DAYS,
-    statuses: ["NOT_VERIFIED", "VERIFIED_API", "VERIFIED_BROWSER", "VERIFIED_API_AND_BROWSER", "NOT_ALLOWED", "EXPIRED"],
+    statuses: [...STATUSES],
     platforms: catalog.platforms.map((p: Platform) => {
       const st = stateOf(catalog, p.id, now);
       return {
@@ -70,7 +70,7 @@ export async function platformsCommand(opts: { json: boolean; check: boolean; ho
       console.log(`${pad(p.id, 22)}${pad(p.eventTypes.join(","), 44)}${pad(st.status, 26)}${pad(channelsCell(st), 12)}${pad(factCell(st, "api"), 14)}${pad(factCell(st, "queue"), 16)}${pad(factCell(st, "limits"), 16)}${pad(st.expiresAt ?? "—", 12)}${mine.length ? `← ${mine.map((m) => `${m.id}(${m.channel})`).join(", ")}` : ""}`);
     }
     const count = (s: string): number => rows.filter((r) => r.st.status === s).length;
-    console.log(`\n${rows.length} plateformes — ordre alphabétique, aucun classement. NOT_VERIFIED : ${count("NOT_VERIFIED")} · EXPIRED : ${count("EXPIRED")} · NOT_ALLOWED : ${count("NOT_ALLOWED")} · VERIFIED_* : ${rows.filter((r) => r.st.status.startsWith("VERIFIED")).length}`);
+    console.log(`\n${rows.length} plateformes — ordre alphabétique, aucun classement. NOT_VERIFIED : ${count("NOT_VERIFIED")} · EXPIRED : ${count("EXPIRED")} · NOT_ALLOWED : ${count("NOT_ALLOWED")} · HUMAN_ONLY : ${count("HUMAN_ONLY")} · API_ONLY/BROWSER_ONLY/API_AND_BROWSER : ${rows.filter((r) => AUTOMATABLE.includes(r.st.status)).length}`);
     console.log("Seules les preuves officielles de platforms/evidence/ décident ; sans preuve valide, le cœur n'automatise rien (canal humain).");
     console.log("Détail et pièces manquantes : npm run platform verify [plateforme]");
     if (catalog.rejected.length) console.log(`⚠ ${catalog.rejected.length} fichier(s) de preuve REFUSÉ(S) : npm run platform check`);

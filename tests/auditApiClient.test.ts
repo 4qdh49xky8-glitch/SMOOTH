@@ -11,7 +11,7 @@ import { FakeApiAdapter, fakeApi } from "./helpers/fakeApi.js";
 /** AUDIT d'ApiClient : tout se passe contre de faux `fetch` ; aucune requête réseau, aucune vraie API. */
 const SECRET = "SECRET-CANARY-1234567890abcdef";
 const client = (fetchImpl: typeof fetch, over: Record<string, unknown> = {}): ApiClient =>
-  new ApiClient({ baseUrl: "https://api.p.example/v1", auth: { envVar: "P_API_KEY" }, env: { P_API_KEY: SECRET }, fetchImpl, minIntervalMs: 200, ...over });
+  new ApiClient({ allowedHosts: ["api.p.example"], baseUrl: "https://api.p.example/v1", auth: { envVar: "P_API_KEY" }, env: { P_API_KEY: SECRET }, fetchImpl, minIntervalMs: 200, ...over });
 const ok = (): Response => new Response("{}", { headers: { "content-type": "application/json" } });
 
 test("redirections vers un AUTRE domaine (301/302/303/307/308, absolue, relative, protocole relatif) : refusées, jamais suivies, secret jamais envoyé ailleurs", async () => {
@@ -44,11 +44,11 @@ test("aucun domaine arbitraire : toute requête émise vise l'hôte ET le préfi
     assert.ok(u.pathname === "/v1" || u.pathname.startsWith("/v1/"), u.href);
     assert.equal(u.username + u.password, "");
   }
-  assert.throws(() => new ApiClient({ baseUrl: "https://api.p.example/v1?x=1", fetchImpl }), /sans paramètres/);
-  assert.throws(() => new ApiClient({ baseUrl: "https://api.p.example/v1#x", fetchImpl }), /sans paramètres/);
-  assert.throws(() => new ApiClient({ baseUrl: "wss://api.p.example/v1", fetchImpl }), /https/);
+  assert.throws(() => new ApiClient({ allowedHosts: ["api.p.example"], baseUrl: "https://api.p.example/v1?x=1", fetchImpl }), /sans paramètres/);
+  assert.throws(() => new ApiClient({ allowedHosts: ["api.p.example"], baseUrl: "https://api.p.example/v1#x", fetchImpl }), /sans paramètres/);
+  assert.throws(() => new ApiClient({ allowedHosts: ["api.p.example"], baseUrl: "wss://api.p.example/v1", fetchImpl }), /https/);
   // L'interface publique n'accepte qu'un CHEMIN : il n'existe aucune méthode pour changer d'hôte ni pour fournir une URL complète.
-  const methods = Object.getOwnPropertyNames(ApiClient.prototype).filter((m) => m !== "constructor" && !["gate", "url", "headers", "sanitize"].includes(m));
+  const methods = Object.getOwnPropertyNames(ApiClient.prototype).filter((m) => m !== "constructor" && !["gate", "url", "headers", "sanitize", "hosts"].includes(m));
   assert.deepEqual(methods, ["request"]);
 });
 
@@ -56,10 +56,10 @@ test("secrets : uniquement par NOM de variable d'environnement — une valeur li
   const seen: (string | undefined)[] = [];
   const fetchImpl = (async (_u: unknown, init?: RequestInit) => (seen.push((init?.headers as Record<string, string>).authorization), ok())) as typeof fetch;
   const literal = { envVar: "P_API_KEY", secret: "LITERAL-SECRET-XYZ", token: "LITERAL-TOKEN", value: "LITERAL-VALUE" } as never;
-  const c = new ApiClient({ baseUrl: "https://api.p.example/v1", auth: literal, env: {}, fetchImpl, minIntervalMs: 200 });
+  const c = new ApiClient({ allowedHosts: ["api.p.example"], baseUrl: "https://api.p.example/v1", auth: literal, env: {}, fetchImpl, minIntervalMs: 200 });
   await assert.rejects(c.request("GET", "/me"), NotLoggedInError);
   assert.equal(seen.length, 0, "rien n'est envoyé sans la variable d'environnement");
-  assert.throws(() => new ApiClient({ baseUrl: "https://tok:en@api.p.example/v1", fetchImpl }), /identifiants/);
+  assert.throws(() => new ApiClient({ allowedHosts: ["api.p.example"], baseUrl: "https://tok:en@api.p.example/v1", fetchImpl }), /identifiants/);
   const src = readFileSync("src/api/ApiClient.ts", "utf8");
   assert.ok(!/authorization["']?\s*[:=]\s*["'`][^"'`$]/i.test(src.replace(/\/\/.*$/gm, "")), "aucun en-tête d'autorisation littéral dans le code");
 });

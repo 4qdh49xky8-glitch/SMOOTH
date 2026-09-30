@@ -1,10 +1,11 @@
 import type { BrowserContext, Page } from "playwright";
 import type { Logger } from "../utils/logger.js";
 
-const HEAVY_URL_PATTERNS = [
-  "*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp", "*.avif", "*.svg", "*.woff", "*.woff2", "*.mp4", "*.webm",
-  "*google-analytics.com*", "*googletagmanager.com*", "*doubleclick.net*", "*connect.facebook.net*", "*hotjar.com*",
-];
+/**
+ * Uniquement des médias décoratifs (images, polices, vidéos). Aucun script n'est bloqué — ni analytique, ni publicitaire, ni de
+ * vérification : des scripts de protection du site peuvent s'y cacher, et les bloquer reviendrait à les contourner.
+ */
+const HEAVY_URL_PATTERNS = ["*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp", "*.avif", "*.svg", "*.woff", "*.woff2", "*.mp4", "*.webm"];
 
 export interface NetworkTuning {
   /** Rétablit le réseau normal (images, polices) pour la reprise manuelle. */
@@ -14,7 +15,7 @@ export interface NetworkTuning {
 /**
  * Optimisations réseau via CDP (plus rapide que page.route : le filtrage se fait dans le
  * navigateur, sans aller-retour JS ↔ Node pour chaque requête).
- * On bloque images/polices/analytics uniquement PENDANT la course ; ne touche à rien d'autre.
+ * On bloque images/polices/vidéos uniquement PENDANT la course ; ne touche à rien d'autre.
  */
 export async function tuneNetwork(
   context: BrowserContext,
@@ -25,11 +26,9 @@ export async function tuneNetwork(
   const cdp = await context.newCDPSession(page);
   await cdp.send("Network.enable");
   await cdp.send("Network.setCacheDisabled", { cacheDisabled: false });
-  // Garde la page « au premier plan » : évite le bridage des timers/rendu.
-  await cdp.send("Emulation.setFocusEmulationEnabled", { enabled: true }).catch(() => undefined);
   if (opts.blockHeavyResources) {
     await cdp.send("Network.setBlockedURLs", { urls: HEAVY_URL_PATTERNS });
-    log.debug("CDP : images/polices/analytics bloqués pendant la course");
+    log.debug("CDP : images/polices/vidéos bloquées pendant la course");
   }
   return {
     release: async () => {

@@ -34,7 +34,7 @@ Sans option, `npm start` lit `config/event.json`. Un ancien fichier plat (V1 : `
 | Champ | Défaut | Rôle |
 |-------|--------|------|
 | `site` | requis | plateforme : `meta.platform` (ou `meta.id`) d'un adaptateur de `src/sites/`, ou entrée de `platforms/catalog.json` |
-| `channel` | `auto` | `auto` : API officielle → navigateur → intervention humaine, selon les adaptateurs et les preuves du catalogue ; `official-api` / `browser` / `human` pour restreindre. Un canal forcé ne peut jamais être plus permissif que l'autorisation ([PLATFORMS.md](PLATFORMS.md)) |
+| `channel` | `auto` | `auto` : API officielle → navigateur → intervention humaine, selon les adaptateurs et les preuves du catalogue ; `official-api` / `browser` / `human` pour restreindre. Un canal forcé ne peut jamais être plus permissif que l'autorisation : la configuration **restreint** seulement, forcer un canal non autorisé est une erreur ([SECURITY.md](SECURITY.md)) |
 | `siteOptions` | `{}` | réglages libres propres à l'adaptateur (validés par `validateOptions`) |
 | `event.name` | requis | nom de l'événement |
 | `event.date` | — | date de l'événement `AAAA-MM-JJ` (contrôle de cohérence) |
@@ -59,7 +59,7 @@ Sans option, `npm start` lit `config/event.json`. Un ancien fichier plat (V1 : `
 | `browser.headless` | `false` | `true` interdit la cession de la main (avertissement/erreur selon le site) |
 | `browser.userDataDir` | `.profile/<profil>` | profil Chromium persistant (votre session) : **un navigateur par profil**, jamais partagé |
 | `browser.debugPort` | `0` | port CDP ; `0` = automatique (retrouvé dans le profil). Un port fixe déjà pris par un autre profil est refusé |
-| `browser.blockHeavyResources` | `true` | images/polices/analytics bloqués pendant la course, rétablis ensuite |
+| `browser.blockHeavyResources` | `true` | images/polices/vidéos bloquées pendant la course, rétablis ensuite |
 | `claude.enabled` | `false` | assistant de réparation de sélecteurs (secours) ; nécessite `ANTHROPIC_API_KEY` |
 | `notifications.desktop/sound` | `true` | notification système / bip |
 | `telemetry.enabled`, `dir` | `true`, `runs` | télémétrie locale ([STATES_AND_TELEMETRY.md](STATES_AND_TELEMETRY.md)) |

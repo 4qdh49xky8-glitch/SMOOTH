@@ -13,6 +13,13 @@ import type { Clock } from "../utils/clock.js";
  */
 export const TELEMETRY_SCHEMA_VERSION = 1;
 
+/**
+ * Durées (ms) de chaque ÉTAPE du flux, mesurées séparément. `null` = étape non atteinte.
+ * En mode « simulation » ce sont des durées de faux site : elles ne disent RIEN de la vitesse d'un achat réel.
+ */
+export const STAGE_NAMES = ["browser_start", "page_ready", "availability_detected", "decision", "selection", "cart_request", "cart_confirmed"] as const;
+export type StageName = (typeof STAGE_NAMES)[number];
+
 export interface AttemptRecord {
   n: number;
   category?: string;
@@ -31,6 +38,8 @@ export interface TelemetryRecord {
   status: string;
   finalState: State;
   failureReason?: FailureReason;
+  /** Durée de chaque étape (ms), voir STAGE_NAMES. */
+  stagesMs: Record<StageName, number | null>;
   metrics: {
     timeToAvailabilityMs: number | null;
     timeToSelectionMs: number | null;
@@ -73,6 +82,7 @@ export class Telemetry {
   private attempts: AttemptRecord[] = [];
   private pollDurations: number[] = [];
   private handoffs = 0;
+  private stages: Partial<Record<StageName, number>> = {};
   private overshoot: number | null = null;
   private clockInfo: { offsetMs: number; rttMs: number } | null = null;
 
@@ -83,6 +93,10 @@ export class Telemetry {
   }
   mark(name: string): void {
     this.marks.push({ name, at: this.o.clock.now() });
+  }
+  /** Durée d'une étape (la première mesure est conservée : c'est celle du chemin nominal). */
+  stage(name: StageName, ms: number): void {
+    if (this.stages[name] === undefined) this.stages[name] = round(ms);
   }
   hasMark(name: string): boolean {
     return this.marks.some((m) => m.name === name);
@@ -128,6 +142,7 @@ export class Telemetry {
       site: this.o.site,
       ...(this.o.profile ? { profile: this.o.profile } : {}),
       ...f,
+      stagesMs: Object.fromEntries(STAGE_NAMES.map((n) => [n, this.stages[n] ?? null])) as Record<StageName, number | null>,
       metrics: {
         timeToAvailabilityMs: detected === null ? null : round(detected - sale),
         timeToSelectionMs: selected === null || detected === null ? null : round(selected - detected),

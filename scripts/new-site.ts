@@ -3,11 +3,11 @@
  *   npm run new-site -- <id> "Nom affiché" [--platform <id-catalogue>] [--channel api|browser] [--dry-run]
  *
  * Le squelette dépend du STATUT de la plateforme (déduit des preuves officielles de platforms/evidence/) :
- *  - VERIFIED_* et canal autorisé → squelette « utilisable » : autorisation, canal et références de preuve pré-remplis
+ *  - API_ONLY | BROWSER_ONLY | API_AND_BROWSER et canal autorisé → squelette « utilisable » : autorisation, canal et références de preuve pré-remplis
  *    (les méthodes restent à écrire) ;
  *  - NOT_VERIFIED / EXPIRED / plateforme absente du catalogue → squelette EXPLICITEMENT marqué NOT_VERIFIED
  *    (`@skeleton-status NOT_VERIFIED`) : le contrat le refuse, le cœur ne peut pas l'exécuter ;
- *  - NOT_ALLOWED (ou canal demandé non autorisé) → AUCUN fichier n'est créé.
+ *  - NOT_ALLOWED / HUMAN_ONLY (ou canal demandé non autorisé) → AUCUN fichier n'est créé.
  */
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
@@ -43,15 +43,17 @@ export function planNewSite(catalog: Catalog, id: string, displayName: string, o
   const st = entry ? stateOf(catalog, platform, o.now) : undefined;
   const wanted = o.channel === "api" ? "official-api" : o.channel === "browser" ? "browser" : undefined;
 
-  if (st?.status === "NOT_ALLOWED") {
-    return { kind: "refused", status: st.status, message: `Plateforme « ${platform} » : NOT_ALLOWED (${st.reasons.join("; ")}). Aucun adaptateur ne doit exister : rien n'a été créé. Reste possible : le canal humain (rappels).` };
+  if (st?.status === "NOT_ALLOWED" || st?.status === "HUMAN_ONLY") {
+    return { kind: "refused", status: st.status, message: `Plateforme « ${platform} » : ${st.status} (${st.reasons.join("; ")}). Aucun adaptateur ne doit exister : rien n'a été créé. Reste possible : le canal humain (rappels).` };
   }
   if (st && st.channels.length > 0) {
     const channel = wanted ?? st.channels[0]!;
     if (!st.channels.includes(channel)) {
       return { kind: "refused", status: st.status, message: `Plateforme « ${platform} » : ${st.status}, mais le canal « ${channel} » n'est pas autorisé par les preuves (autorisés : ${st.channels.join(", ")}). Rien n'a été créé.` };
     }
-    const ev = st.history.find((h) => h.topic === "automation" && !h.expired)!;
+    // La preuve citée est celle qui autorise CE canal (api/both pour l'API, browser/both pour l'interface).
+    const grants = channel === "official-api" ? ["api", "both"] : ["browser", "both"];
+    const ev = st.history.find((h) => h.topic === "automation" && !h.expired && grants.includes(h.channel ?? ""))!;
     const ctx: RenderContext = { platform, channel, verified: true, status: st.status, reasons: st.reasons, evidence: { url: ev.url, checkedAt: ev.checkedAt, authorization: ev.authorization } };
     return { kind: "skeleton", verified: true, status: st.status, files: renderNewSite(id, displayName, ctx), notes: [`autorisation issue de la preuve du ${ev.checkedAt} (${ev.url}), valable jusqu'au ${st.expiresAt}`] };
   }

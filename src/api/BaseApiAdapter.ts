@@ -1,4 +1,5 @@
 import type { Page } from "playwright";
+import type { ApiClient } from "./ApiClient.js";
 import type { BotConfig } from "../config/schema.js";
 import { SelectorResolver } from "../selectors/resolver.js";
 import type { AdapterContext, AdapterMeta, Blocker, CartSummary, Offer, SaleSnapshot, SiteAdapter } from "../sites/SiteAdapter.js";
@@ -16,12 +17,17 @@ import type { Logger } from "../utils/logger.js";
  *  - aucun navigateur : `ctx.page` refuse tout accès sauf `bringToFront` (sans effet).
  *
  * Un adaptateur qui l'étend doit déclarer `meta.channel = "official-api"` et `capabilities.officialApi = true` ; il n'est
- * exécutable que si le catalogue affiche VERIFIED_API ou VERIFIED_API_AND_BROWSER pour sa plateforme.
+ * exécutable que si le catalogue affiche API_ONLY ou API_AND_BROWSER pour sa plateforme.
  */
 export abstract class BaseApiAdapter implements SiteAdapter {
   abstract readonly meta: AdapterMeta;
   /** Marqueur lu par le contrat : cet adaptateur n'utilise pas de navigateur. */
   readonly isApiAdapter = true;
+  /** Client HTTP encadré de l'adaptateur : ses hôtes sont vérifiés contre le catalogue avant tout contact. */
+  readonly client?: ApiClient;
+  networkHosts(): string[] {
+    return this.client ? this.client.hosts : [];
+  }
   /** Pas d'URL de paiement : aucun navigateur, et aucune opération de paiement n'existe dans l'interface. */
   readonly paymentUrlPatterns: RegExp[] = [];
 

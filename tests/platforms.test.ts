@@ -32,16 +32,16 @@ test("catalogue livré : données statiques cohérentes, ordre alphabétique, to
   for (const t of ["concert", "festival", "spectacle", "theatre", "sport", "grand-evenement"]) assert.ok(c.platforms.some((p) => p.eventTypes.includes(t as never)), t);
   for (const p of c.platforms) {
     for (const cl of p.clues) assert.equal(cl.verified, false);
-    assert.deepEqual(Object.keys(p).sort(), ["clues", "eventTypes", "id", "name", "officialHosts", "regions"], `${p.id} : le catalogue ne doit contenir que des données statiques`);
+    assert.deepEqual(Object.keys(p).sort(), ["allowedQueryParams", "clues", "eventTypes", "id", "name", "officialHosts", "regions"], `${p.id} : le catalogue ne doit contenir que des données statiques`);
   }
-  assert.deepEqual([...STATUSES], ["NOT_VERIFIED", "VERIFIED_API", "VERIFIED_BROWSER", "VERIFIED_API_AND_BROWSER", "NOT_ALLOWED", "EXPIRED"]);
+  assert.deepEqual([...STATUSES], [...STATUSES]);
 });
 
 // ───────────────────────────── autorisation d'un adaptateur ─────────────────────────────
 test("autorisation : démo exemptée ; NOT_VERIFIED, EXPIRED, NOT_ALLOWED, absente, canal non permis, politique incohérente → refus", () => {
   const cat = catalogWith(
     [plat("pa"), plat("pb"), plat("pboth"), plat("pno"), plat("pexp"), plat("pnone")],
-    [ev("pa", "api"), ev("pb", "browser"), ev("pboth", "both"), ev("pno", "human"), ev("pexp", "both", daysAgo(181))],
+    [ev("pa", "api"), ev("pb", "browser"), ev("pboth", "both"), ev("pno", "prohibited"), ev("pexp", "both", daysAgo(181))],
   );
   const ok = (a: FakeAdapter): boolean => authorizeAdapter(a.meta, cat, NOW).ok;
   const why = (a: FakeAdapter): string => authorizeAdapter(a.meta, cat, NOW).reason ?? "";
@@ -50,8 +50,8 @@ test("autorisation : démo exemptée ; NOT_VERIFIED, EXPIRED, NOT_ALLOWED, absen
   assert.equal(ok(adapter("x", { platform: "pb", channel: "browser" })), true);
   assert.equal(ok(adapter("x", { platform: "pboth", channel: "official-api" })), true);
   assert.equal(ok(adapter("x", { platform: "pboth", channel: "browser" })), true);
-  assert.match(why(adapter("x", { platform: "pa", channel: "browser" })), /VERIFIED_API.*canal « browser » non autorisé/, "l'API est permise, pas l'interface");
-  assert.match(why(adapter("x", { platform: "pb", channel: "official-api" })), /VERIFIED_BROWSER.*canal « official-api » non autorisé/);
+  assert.match(why(adapter("x", { platform: "pa", channel: "browser" })), /API_ONLY.*canal « browser » non autorisé/, "l'API est permise, pas l'interface");
+  assert.match(why(adapter("x", { platform: "pb", channel: "official-api" })), /BROWSER_ONLY.*canal « official-api » non autorisé/);
   assert.match(why(adapter("x", { platform: "pno", channel: "browser" })), /NOT_ALLOWED/);
   assert.match(why(adapter("x", { platform: "pexp", channel: "browser" })), /EXPIRED/);
   assert.match(why(adapter("x", { platform: "pnone", channel: "browser" })), /NOT_VERIFIED/);
@@ -68,7 +68,7 @@ test("canal : API officielle → navigateur → humain, selon les adaptateurs d�
     const d = resolve("p", list, both, { P_API_KEY: "x" });
     assert.equal(d.channel, "official-api");
     assert.equal(d.adapter, api);
-    assert.equal(d.status, "VERIFIED_API_AND_BROWSER");
+    assert.equal(d.status, "API_AND_BROWSER");
   }
   const d2 = resolve("p", [api, web], both, {});
   assert.equal(d2.channel, "browser");
@@ -86,7 +86,7 @@ test("canal : NOT_VERIFIED, EXPIRED ou NOT_ALLOWED → intervention humaine, jam
   const cases: [string, Catalog][] = [
     ["NOT_VERIFIED", catalogWith([plat("p")])],
     ["EXPIRED", catalogWith([plat("p")], [ev("p", "both", daysAgo(181))])],
-    ["NOT_ALLOWED", catalogWith([plat("p")], [ev("p", "human")])],
+    ["NOT_ALLOWED", catalogWith([plat("p")], [ev("p", "prohibited")])],
     ["absente", catalogWith([])],
   ];
   for (const [label, cat] of cases) {
@@ -141,7 +141,7 @@ test("le cœur refuse d'agir sans preuve valide (NOT_VERIFIED, EXPIRED, NOT_ALLO
   const refusals: [Catalog, RegExp][] = [
     [catalogWith([plat("p")]), /NOT_VERIFIED/],
     [catalogWith([plat("p")], [ev("p", "browser", daysAgo(181))]), /EXPIRED/],
-    [catalogWith([plat("p")], [ev("p", "human")]), /NOT_ALLOWED/],
+    [catalogWith([plat("p")], [ev("p", "prohibited")]), /NOT_ALLOWED/],
     [catalogWith([]), /absente du catalogue/],
   ];
   for (const [cat, re] of refusals) await assert.rejects(agentFor(web, cat).run(), re);

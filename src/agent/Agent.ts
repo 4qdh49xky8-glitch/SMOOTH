@@ -1,6 +1,6 @@
 import type { BotConfig } from "../config/schema.js";
 import { notify } from "../notifications/notify.js";
-import { assertAuthorized } from "../platforms/authorize.js";
+import { assertAuthorized, assertNetworkAllowed } from "../platforms/authorize.js";
 import { loadCatalog, type Catalog } from "../platforms/catalog.js";
 import { assertCompliant } from "../sites/compliance.js";
 import type { AdapterContext, Blocker, CartSummary, Offer, SaleSnapshot, SiteAdapter } from "../sites/SiteAdapter.js";
@@ -14,6 +14,8 @@ import {
   RateLimitedError,
   SelectorNotFoundError,
   StopRunError,
+  AuthorizationExpiredError,
+  LockLostError,
 } from "../utils/errors.js";
 import type { Logger } from "../utils/logger.js";
 import { waitForEnter } from "../utils/prompt.js";
@@ -28,7 +30,7 @@ import { AUTO_DETECTABLE, reasonForState, State, type BlockingState, type Failur
  * cart-mismatch    billets ajoutés mais panier non conforme (quantité/prix) ou illisible : à vérifier À LA MAIN
  * ready-not-added  offre sélectionnée, ajout laissé à l'humain (autoAddToCart=false)
  */
-export type RunStatus = "in-cart" | "ready-not-added" | "cart-mismatch" | "sale-timeout" | "blocked" | "error";
+export type RunStatus = "in-cart" | "ready-not-added" | "cart-mismatch" | "sale-timeout" | "blocked" | "authorization-expired" | "error";
 
 export interface RunResult {
   status: RunStatus;
@@ -66,6 +68,14 @@ export interface AgentDeps {
   waitForEnter?: typeof waitForEnter;
   /** Catalogue des plateformes (par défaut platforms/catalog.json, chargé seulement pour un adaptateur non-démo). */
   catalog?: Catalog;
+  /** Verrou(s) de l'événement/du profil détenu(s) par cette instance : revérifié(s) à chaque reprise après une main humaine. */
+  lock?: { verify(): boolean };
+  /** Durée (ms) du démarrage du navigateur, mesurée par l'appelant (télémétrie : browser_start). */
+  browserStartMs?: number;
+  /** Chargeur du catalogue (défaut : fichiers du dépôt). Sert à relire les preuves pendant la surveillance ; remplaçable en test. */
+  catalogLoader?: () => Catalog;
+  /** Intervalle de la relecture LOCALE des preuves pendant une longue surveillance (défaut 30 s). Aucune requête vers la plateforme. */
+  authCheckIntervalMs?: number;
 }
 
 type BuildExtra = Partial<Pick<RunResult, "failureReason" | "offer" | "cart" | "cartOk" | "problems" | "blocker">>;
@@ -124,6 +134,7 @@ export class Agent {
       enabled: d.config.telemetry.enabled,
       dir: d.config.telemetry.dir,
     });
+    if (d.browserStartMs !== undefined) this.telemetry.stage("browser_start", d.browserStartMs);
   }
 
   /**
@@ -143,18 +154,58 @@ export class Agent {
     this.log.info(`État → ${s}${detail ? ` (${detail})` : ""}`);
   }
 
-  /** Autorisation de plateforme (preuves valides, non expirées, canal permis) ; rejouée à chaque reprise après une main humaine. */
-  private reauthorize(): void {
-    const { adapter } = this.d;
-    const catalog = this.d.catalog ?? (adapter.meta.compliance.policy === "demo" ? undefined : loadCatalog());
-    if (catalog) assertAuthorized(adapter.meta, catalog);
+  private catalog?: Catalog;
+  private lastDiskCheck = 0;
+
+  /**
+   * Relecture LOCALE de l'autorisation (aucune requête vers la plateforme) : preuves valides et non expirées, canal toujours
+   * autorisé, URL de l'événement et hôtes de l'adaptateur toujours dans les domaines officiels. `reload` relit les fichiers de
+   * preuve (un catalogue fourni par l'appelant n'est pas relu : il est évalué à l'instant présent, expiration comprise).
+   */
+  private reauthorize(reload = false): void {
+    const { adapter, config } = this.d;
+    if (adapter.meta.compliance.policy === "demo") return;
+    if (!this.catalog || (reload && !this.d.catalog)) this.catalog = this.d.catalog ?? (this.d.catalogLoader ?? loadCatalog)();
+    try {
+      assertAuthorized(adapter.meta, this.catalog);
+      assertNetworkAllowed(adapter, config, this.catalog);
+    } catch (e) {
+      throw new AuthorizationExpiredError((e as Error).message);
+    }
+  }
+
+  /** Vérification périodique pendant la surveillance : évaluation à chaque tour (mémoire), relecture des fichiers à l'intervalle. */
+  private periodicAuthCheck(): void {
+    const now = Date.now();
+    const interval = this.d.authCheckIntervalMs ?? 30_000;
+    const reload = now - this.lastDiskCheck >= interval;
+    if (reload) this.lastDiskCheck = now;
+    this.reauthorize(reload);
+  }
+
+  /**
+   * Après TOUTE intervention humaine, avant de reprendre : 1) autorisation relue localement, 2) canal toujours autorisé,
+   * 3) verrou toujours détenu, 4) état cohérent — seulement ensuite on reprend. Échec d'autorisation : AUTHORIZATION_EXPIRED et
+   * aucune requête de plus.
+   */
+  private resumeChecks(): void {
+    this.reauthorize(true); // 1 + 2 (assertAuthorized vérifie le canal de l'adaptateur) + hôtes
+    if (this.d.lock && !this.d.lock.verify()) throw new LockLostError(); // 3
+    if (this.state === State.CART_SUCCESS || this.state === State.PURCHASE_LIMIT) throw new Error(`reprise impossible depuis l'état ${this.state}`); // 4
   }
 
   async run(): Promise<RunResult> {
     const { adapter } = this.d;
     assertCompliant(adapter.meta, adapter.resolveEventUrl(this.d.config)); // refus avant toute action
-    // Tout adaptateur non-démo doit correspondre à une plateforme dont les PREUVES officielles autorisent son canal.
-    this.reauthorize();
+    // Tout adaptateur non-démo doit correspondre à une plateforme dont les PREUVES officielles autorisent son canal, et n'atteindre
+    // que ses domaines officiels. Ici c'est un REFUS de démarrer (exception), pas un arrêt en cours de run.
+    if (adapter.meta.compliance.policy !== "demo") {
+      const catalog = this.d.catalog ?? (this.d.catalogLoader ?? loadCatalog)();
+      assertAuthorized(adapter.meta, catalog);
+      assertNetworkAllowed(adapter, this.d.config, catalog);
+      this.catalog = catalog;
+    }
+    this.lastDiskCheck = Date.now();
     let result: RunResult;
     try {
       result = await this.execute();
@@ -179,6 +230,16 @@ export class Agent {
     if (err instanceof StopRunError) {
       this.log.error(err.message);
       return this.build("blocked", err.blocker.state, { failureReason: reasonForState(err.blocker.state), blocker: err.blocker });
+    }
+    if (err instanceof AuthorizationExpiredError) {
+      this.log.error(err.message);
+      this.setState(State.AUTHORIZATION_EXPIRED, sanitize(err.message, 80));
+      return this.build("authorization-expired", State.AUTHORIZATION_EXPIRED, { failureReason: "AUTHORIZATION_EXPIRED" });
+    }
+    if (err instanceof LockLostError) {
+      this.log.error(err.message);
+      this.setState(State.ERROR, "LOCK_LOST");
+      return this.build("error", State.ERROR, { failureReason: "LOCK_LOST" });
     }
     const reason: FailureReason =
       err instanceof HumanRequiredError
@@ -216,9 +277,11 @@ export class Agent {
       this.log.info(`Attente jusqu'à la préparation (${new Date(armAt).toISOString()})…`);
       await waitUntil(armAt, clock, { spinThresholdMs: 50 }); // précision suffisante ; pas d'attente active longue
     }
+    const readyStart = performance.now();
     await this.step("login", () => adapter.ensureLoggedIn(ctx));
     this.log.info("Compte connecté.");
     await this.step("prepare", () => adapter.prepare(ctx));
+    this.telemetry.stage("page_ready", performance.now() - readyStart);
     await this.d.onArmed?.();
     if (this.saleEpochMs - clock.now() > 20_000) await this.syncClock(); // recalage final
 
@@ -259,12 +322,14 @@ export class Agent {
   private async watchAndBuy(): Promise<RunResult> {
     const { config, adapter, ctx, clock } = this.d;
     const deadline = this.saleEpochMs + config.timing.maxWaitAfterSaleSeconds * 1000;
+    const triggeredAt = clock.now();
     const cooldown = new Map<string, number>(); // offre → instant avant lequel on ne la retente pas
     let attempts = 0;
     let readErrors = 0;
     let lastSummary = "";
 
     while (clock.now() < deadline) {
+      this.periodicAuthCheck(); // local : jamais de requête vers la plateforme ; expiré → arrêt avant la prochaine lecture
       const t0 = clock.now();
       let snapshot: SaleSnapshot;
       let blocker: Blocker | null;
@@ -309,11 +374,14 @@ export class Agent {
         this.setState(saleState);
         if (saleState === State.AVAILABLE && !this.telemetry.hasMark("availability-detected")) {
           this.telemetry.mark("availability-detected");
+          this.telemetry.stage("availability_detected", clock.now() - triggeredAt);
           this.log.info("Disponibilité détectée.");
         }
 
         const now = clock.now();
+        const decisionStart = performance.now();
         const ranked = rankOffers(snapshot.offers, config.tickets, config.strategy).filter((o) => (cooldown.get(o.id) ?? 0) <= now);
+        if (ranked.length) this.telemetry.stage("decision", performance.now() - decisionStart);
         const summary = `${snapshot.offers.length} offres, ${ranked.length} correspondent`;
         if (summary !== lastSummary) {
           lastSummary = summary;
@@ -365,18 +433,23 @@ export class Agent {
   private async tryOffer(offer: Offer): Promise<Outcome> {
     const { config, adapter, ctx } = this.d;
     const quantity = config.tickets.quantity;
+    this.reauthorize(); // juste avant toute action d'achat : évaluation locale à l'instant présent
     this.log.info(
       `Tentative : ${offer.category} · ${offer.pricePerTicket} ${offer.currency}/billet · id=${offer.id} · côte à côte=${String(offer.seatsTogether)}`,
     );
+    const selectionStart = performance.now();
     await this.step("selectOffer", () => adapter.selectOffer(ctx, offer, quantity));
     if (adapter.selectSeats) await this.step("selectSeats", () => adapter.selectSeats!(ctx, offer, quantity));
+    this.telemetry.stage("selection", performance.now() - selectionStart);
     this.telemetry.mark("offer-selected");
 
     if (!config.behavior.autoAddToCart) {
       this.setState(State.MANUAL_SELECTION, "autoAddToCart=false");
       return { status: "ready-not-added", finalState: State.MANUAL_SELECTION, extra: { offer }, attempt: { outcome: "selected" } };
     }
+    const cartStart = performance.now();
     await this.step("addToCart", () => adapter.addToCart(ctx));
+    this.telemetry.stage("cart_request", performance.now() - cartStart);
     this.telemetry.mark("added-to-cart");
     // Notification IMMÉDIATE (avant la relecture du panier) : c'est ce qui compte quand chaque seconde compte.
     this.notify({
@@ -386,8 +459,10 @@ export class Agent {
     });
 
     let cart: CartSummary | undefined;
+    const confirmStart = performance.now();
     try {
       cart = await this.step("readCart", () => adapter.readCart(ctx));
+      this.telemetry.stage("cart_confirmed", performance.now() - confirmStart);
       this.telemetry.mark("cart-verified");
     } catch (err) {
       this.log.warn(`Ajout effectué mais lecture du panier impossible : ${(err as Error).message}`);
@@ -509,9 +584,9 @@ export class Agent {
       enter.cancel();
       if (detectable) await auto; // la boucle est terminée avant de reprendre : aucune action concurrente
     }
-    // Reprise (connexion, file d'attente, CAPTCHA, plan de salle) : l'autorisation est revérifiée AVANT toute nouvelle action.
-    // Une preuve qui expire pendant l'attente humaine (ou un catalogue modifié entre-temps) arrête le bot.
-    this.reauthorize();
+    // Reprise (connexion, file d'attente, CAPTCHA, plan de salle) : autorisation, canal, verrou et état revérifiés AVANT toute action.
+    // Une preuve qui expire pendant l'attente humaine (ou un catalogue modifié entre-temps) arrête le bot : zéro requête de plus.
+    this.resumeChecks();
     this.ackUntil.set(blocker.state, this.d.clock.now() + HUMAN_ACK_MS);
     this.state = before; // retour à l'état précédent (le blocage est levé)
     this.log.info("Reprise du bot.");

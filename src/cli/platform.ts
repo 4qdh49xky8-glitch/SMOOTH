@@ -33,7 +33,7 @@ export function evidenceTemplate(platformId: string, topic: Topic = "automation"
     platform: platformId,
     checkedAt: "AAAA-MM-JJ",
     source: { url: "https://… (page officielle, domaine de la plateforme)", title: "Titre de la page officielle" },
-    ...(topic === "automation" ? { channel: "api | browser | both | human" } : { topic, value: TOPIC_VALUES[topic as Exclude<Topic, "automation">].join(" | ") }),
+    ...(topic === "automation" ? { channel: "api | browser | both | human | prohibited" } : { topic, value: TOPIC_VALUES[topic as Exclude<Topic, "automation">].join(" | ") }),
     authorization: "Ce que la source autorise ou interdit, en une phrase.",
     excerpt: "Passage EXACT copié de la page officielle (≥ 30 caractères).",
     note: "facultatif",

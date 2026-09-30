@@ -64,7 +64,7 @@ test("vie privée : le fichier enregistré ne contient ni URL, ni e-mail, ni ide
   const file = t.save(t.finalize({ status: "error", finalState: "ERROR", failureReason: "ADAPTER_ERROR", cart: { itemCount: 2, totalPrice: 240, currency: "EUR" } }))!;
   const text = readFileSync(file, "utf8");
   assert.ok(!/https?:\/\//.test(text) && !/@/.test(text) && !text.includes("SECRET"), text);
-  assert.deepEqual(Object.keys(JSON.parse(text)).sort(), ["attemptsDetail", "cart", "failureReason", "finalState", "metrics", "mode", "profile", "schemaVersion", "site", "startedAt", "states", "status", "timeline"]);
+  assert.deepEqual(Object.keys(JSON.parse(text)).sort(), ["attemptsDetail", "cart", "failureReason", "finalState", "metrics", "mode", "profile", "schemaVersion", "site", "stagesMs", "startedAt", "states", "status", "timeline"]);
   assert.equal(readdirSync(dir).length, 1);
 });
 

@@ -4,18 +4,18 @@ import { resolveChannel } from "../agent/channels.js";
 import { ClaudeAssistant } from "../agent/claude.js";
 import { runHumanAssist } from "../agent/humanAssist.js";
 import { createApiContext } from "../api/BaseApiAdapter.js";
-import { installPaymentGuard } from "../browser/guards.js";
+import { installNetworkGuards } from "../browser/guards.js";
 import { traceSlowRequests, tuneNetwork } from "../browser/cdp.js";
 import { defaultUserDataDir, openBrowser, type BrowserSession } from "../browser/launch.js";
 import { loadConfig, resolveConfigPath } from "../config/load.js";
-import { assertAuthorized } from "../platforms/authorize.js";
+import { allowedHosts, assertAuthorized, assertNetworkAllowed } from "../platforms/authorize.js";
 import { loadCatalog, type Catalog } from "../platforms/catalog.js";
 import { SelectorResolver } from "../selectors/resolver.js";
 import { assertCompliant } from "../sites/compliance.js";
 import { discoverAdapters } from "../sites/registry.js";
 import type { AdapterContext, SiteAdapter } from "../sites/SiteAdapter.js";
 import { Clock, estimateOffset } from "../utils/clock.js";
-import { acquireEventLock, eventKey } from "../utils/lock.js";
+import { acquireEventLock, combineLocks, eventKey, profileKey, type EventLock } from "../utils/lock.js";
 import { createLogger, pickLevel } from "../utils/logger.js";
 import { trackSecretEnv } from "../utils/redact.js";
 import { waitForEnter } from "../utils/prompt.js";
@@ -72,17 +72,30 @@ export async function liveCommand(o: LiveOptions, deps: LiveDeps = {}): Promise<
 
   const adapter = decision.adapter!;
   trackSecretEnv(...(adapter.meta.requires?.env ?? []));
-  // Défense en profondeur : même si le choix de canal était contourné, on revérifie l'autorisation AVANT d'ouvrir quoi que ce soit.
+  // Défense en profondeur : même si le choix de canal était contourné, on revérifie l'autorisation, le canal et les HÔTES
+  // (URL de l'événement, hôtes de l'adaptateur) AVANT d'ouvrir quoi que ce soit ou d'émettre la moindre requête.
   assertAuthorized(adapter.meta, catalog);
   assertCompliant(adapter.meta, adapter.resolveEventUrl(config));
+  assertNetworkAllowed(adapter, config, catalog);
+  const hosts = allowedHosts(adapter.meta, catalog);
 
-  // Un seul bot par événement (même adaptateur + même page d'événement), quel que soit le profil.
-  const lock = o.command === "run" ? acquireEventLock(eventKey(adapter.meta.id, adapter.resolveEventUrl(config)), instance) : undefined;
-  process.once("SIGINT", () => process.exit(130)); // déclenche 'exit' : le verrou est libéré
+  // Un seul bot par événement ET par profil de navigateur, pour TOUTE commande qui pilote une session (run, login, check) :
+  // deux instances multiplieraient les sessions et les paniers (et partageraient un navigateur).
+  const userDataDir = config.browser.userDataDir ?? defaultUserDataDir(profile);
+  const locks: EventLock[] = [];
+  let lock: EventLock | undefined;
+  process.once("SIGINT", () => process.exit(130)); // déclenche 'exit' : les verrous sont libérés
   try {
+    locks.push(acquireEventLock(eventKey(adapter.meta.id, adapter.resolveEventUrl(config)), instance));
+    if (decision.channel === "browser") locks.push(acquireEventLock(profileKey(userDataDir), instance));
+    lock = combineLocks(...locks);
+
     // Canal API : aucun navigateur. Canal navigateur : un navigateur par profil.
-    const session: BrowserSession | undefined =
-      decision.channel === "browser" ? await openBrowser(config, log.child("browser"), { userDataDir: config.browser.userDataDir ?? defaultUserDataDir(profile) }) : undefined;
+    const t0 = performance.now();
+    const session: BrowserSession | undefined = decision.channel === "browser" ? await openBrowser(config, log.child("browser"), { userDataDir }) : undefined;
+    const browserStartMs = session ? performance.now() - t0 : undefined;
+    // Garde réseau AVANT toute navigation (login, check et run) : paiement interdit, navigations limitées aux domaines autorisés.
+    const releaseGuard = session ? await installNetworkGuards(session.context, { paymentPatterns: adapter.paymentUrlPatterns, allowedHosts: hosts, log: log.child("guard") }) : async () => undefined;
     const ctx: AdapterContext = session
       ? { config, context: session.context, page: session.page, log: log.child(`site:${adapter.meta.id}`), env: process.env, selectors: new SelectorResolver(adapter.meta.id) }
       : createApiContext(config, log.child(`site:${adapter.meta.id}`), process.env);
@@ -95,6 +108,7 @@ export async function liveCommand(o: LiveOptions, deps: LiveDeps = {}): Promise<
       await session.page.goto(adapter.resolveEventUrl(config));
       log.info("Connectez-vous dans la fenêtre. Le profil (cookies) est conservé pour les prochains runs.");
       await waitForEnter("Appuyez sur Entrée quand vous êtes connecté.").promise;
+      await releaseGuard();
       await session.detach();
       return 0;
     }
@@ -108,12 +122,12 @@ export async function liveCommand(o: LiveOptions, deps: LiveDeps = {}): Promise<
       } else {
         log.info("Cet adaptateur n'expose pas d'heure serveur précise (repli sur l'en-tête Date, ±500 ms).");
       }
+      await releaseGuard();
       await session?.detach();
       return 0;
     }
 
     // run
-    const releaseGuard = session ? await installPaymentGuard(session.context, adapter.paymentUrlPatterns, log.child("guard"), () => undefined) : async () => undefined;
     const tuning = session ? await tuneNetwork(session.context, session.page, config.browser, log.child("cdp")) : { release: async () => undefined };
     if (session && o.trace) traceSlowRequests(session.page, log.child("net"));
 
@@ -122,6 +136,8 @@ export async function liveCommand(o: LiveOptions, deps: LiveDeps = {}): Promise<
       adapter,
       ctx,
       catalog,
+      lock,
+      browserStartMs,
       claude: new ClaudeAssistant(config.claude, log.child("claude")),
       log,
       clock: new Clock(),
@@ -138,6 +154,8 @@ export async function liveCommand(o: LiveOptions, deps: LiveDeps = {}): Promise<
       log.info(session ? "Le navigateur reste ouvert : vérifiez le panier et payez vous-même. Le bot s'arrête ici." : "Panier réservé via l'API officielle : finalisez et payez vous-même sur le site officiel. Le bot s'arrête ici.");
     } else if (result.status === "cart-mismatch") {
       log.warn("Le panier n'a pas pu être validé. Vérifiez-le à la main avant tout paiement.");
+    } else if (result.status === "authorization-expired") {
+      log.error("Autorisation expirée ou retirée pendant le run : arrêt, aucune requête de plus. Mettez à jour les preuves (npm run platform verify).");
     }
     if (session) {
       if (o.exitWhenDone) await session.shutdown();
@@ -146,5 +164,6 @@ export async function liveCommand(o: LiveOptions, deps: LiveDeps = {}): Promise<
     return result.status === "in-cart" || result.status === "ready-not-added" ? 0 : 1;
   } finally {
     lock?.release();
+    for (const l of locks) l.release();
   }
 }
