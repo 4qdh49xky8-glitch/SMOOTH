@@ -26,6 +26,8 @@ export interface ScriptedSaleOptions {
   cartMs?: number;
   /** Issue de la n-ième tentative d'ajout au panier. */
   onAdd?: (attempt: number) => "ok" | "unavailable" | "limit";
+  /** Attendu (await) pendant addToCart, avant le retour : permet à un test d'agir de façon déterministe PENDANT que l'agent tient ses verrous. */
+  whileAdding?: () => Promise<void>;
   /** Quantité réellement présente dans le panier relu (défaut : celle demandée). */
   cartQuantity?: (requested: number) => number;
   /** Limite de débit (429) à la lecture n° `poll`. */
@@ -109,6 +111,7 @@ export class ScriptedSaleAdapter extends BaseSiteAdapter {
     this.adds++;
     await sleep(this.o.addMs ?? 5);
     const r = this.o.onAdd?.(this.adds) ?? "ok";
+    await this.o.whileAdding?.();
     if (r === "unavailable") throw new OfferUnavailableError("vendu entre-temps");
     if (r === "limit") throw new BlockerError({ state: "PURCHASE_LIMIT", message: "limite d'achat atteinte" });
   }

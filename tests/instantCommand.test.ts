@@ -72,8 +72,10 @@ test("jamais deux contrôleurs : pendant qu'un sale:instant s'exécute, sale:wai
   const t = setup();
   let during: Promise<void> | undefined;
   // le crochet ci-dessous s'exécute PENDANT addToCart du premier contrôleur (verrous tenus)
-  t.adapter.o.onAdd = () => {
-    during = (async () => {
+  // `whileAdding` est attendu par addToCart : les tentatives concurrentes se terminent TOUTES avant que le contrôleur ne rende ses verrous
+  // (sinon la course entre ce crochet et la fin normale du contrôleur rendait le test aléatoire).
+  t.adapter.o.whileAdding = async () => {
+    await (during = (async () => {
       // un sale:wait concurrent sur le MÊME événement/profil (même dossier de verrous) : refusé
       const dup = await saleWaitCommand({ target: t.file }, { print: () => undefined, assessOptions: { adapters: [t.adapter], catalog: t.catalog, env: {}, locksDir: t.locksDir }, run: async () => 0 });
       results.wait = dup;
@@ -88,8 +90,7 @@ test("jamais deux contrôleurs : pendant qu'un sale:instant s'exécute, sale:wai
       const keys = lockKeysFor(t.adapter, loadConfig(t.file), "browser", "sale");
       results.run = (() => { try { acquireEventLock(keys[0]!.key, "run#1", t.locksDir); return "acquis"; } catch (e) { return (e as Error).message; } })();
       results.profile = (() => { try { acquireEventLock(keys[1]!.key, "login#1", t.locksDir); return "acquis"; } catch (e) { return (e as Error).message; } })();
-    })();
-    return "ok";
+    })());
   };
   const code = await saleInstantCommand({ target: t.file, recheckSeconds: 1 }, t.deps);
   await during;
