@@ -54,6 +54,7 @@ export function formatDashboard(r: InstantReport): string {
     `  selection_to_cart           ${ms(t.selection_to_cart_request)}`,
     `  cart_request_to_success     ${ms(t.cart_request_to_cart_success)}`,
     `  sale_open_to_cart           ${ms(t.total_sale_open_to_cart)}`,
+    ...(r.status === "CART_SUCCESS" ? [`  cart_success_to_ui_ready    ${ms(t.cart_success_to_ui_ready)}`, `  ui_ready_to_user_control    ${ms(t.ui_ready_to_user_control)}`] : []),
     "PERFORMANCE:",
     `  claude_calls                ${m.claudeCallsInCriticalPath} (chemin critique) / ${m.claudeCallsTotal} (total)`,
     `  network_requests            ${m.observedRequests ?? m.networkOperations} ${m.observedRequests === undefined ? "(opérations d'adaptateur)" : "(vues côté serveur de fixture)"}`,
@@ -66,7 +67,7 @@ export function formatDashboard(r: InstantReport): string {
     `  payment                     ${r.security.payment}`,
   ];
   if (r.blockersSeen.length) l.splice(1, 0, `BLOCKERS: ${r.blockersSeen.join(", ")} (cession de la main, aucun contournement)`);
-  if (r.status === "CART_SUCCESS") l.push("", "CART_SUCCESS", "Payment remains manual.");
+  if (r.status === "CART_SUCCESS") l.push("", "CART_SUCCESS", "PAYMENT_REQUIRED", "PAYMENT_MANUAL", "Payment remains manual.");
   return l.join("\n");
 }
 

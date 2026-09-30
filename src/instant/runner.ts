@@ -26,6 +26,7 @@ import type { SelectorSpec } from "../selectors/resolver.js";
 import { compileSelection } from "./compile.js";
 import { SaleMonitor, instrument, newCounts } from "./monitor.js";
 import { formatDashboard, type InstantReport, type InstantStatus } from "./report.js";
+import { handOffToUser, type HandoffPage } from "./handoff.js";
 import { Timeline, timingsOf, type TimelineEvent } from "./timeline.js";
 
 /**
@@ -215,7 +216,12 @@ export async function runInstantSale(o: InstantSaleOptions, deps: InstantSaleDep
 
     const ok = result.status === "in-cart";
     if (!ok) timeline.clear("T_CART_SUCCESS"); // une relecture du panier n'est un succès que si le cœur l'a validé
-    else print(`[${rel((timeline.get("T_CART_SUCCESS") ?? wallNowFallback()) - saleStart)}] CART_SUCCESS`);
+    else {
+      print(`[${rel((timeline.get("T_CART_SUCCESS") ?? wallNowFallback()) - saleStart)}] CART_SUCCESS`);
+      // Passage de main immédiat : surveillance déjà arrêtée (onFinish), panier déjà revérifié par le cœur, aucune navigation.
+      monitor.stop();
+      await handOffToUser(session?.page as HandoffPage | undefined, timeline, print);
+    }
     for (const st of result.telemetry?.states ?? []) if (["QUEUE", "CAPTCHA", "BLOCKED", "LOGIN_REQUIRED"].includes(st.state)) blockersSeen.add(st.state);
     const mm = monitor.getMetrics();
     const operations = counts.fetchSale + counts.pollState + counts.getAvailability + counts.getOffers + counts.selectOffer + counts.addToCart + counts.getCartState;
@@ -246,7 +252,7 @@ export async function runInstantSale(o: InstantSaleOptions, deps: InstantSaleDep
     const dashboard = formatDashboard(report);
     print(dashboard);
     if (session) {
-      if (o.exitWhenDone) await session.shutdown?.();
+      if (o.exitWhenDone && !ok) await session.shutdown?.(); // jamais de fermeture après CART_SUCCESS : l'utilisateur paie
       else await session.detach?.(); // le navigateur reste ouvert pour le paiement manuel
     }
     return { code: ok ? 0 : 1, report, dashboard, run: result, timeline: timeline.snapshot() };
@@ -280,7 +286,7 @@ function emptyReport(status: InstantStatus, reason: string, security: InstantRep
   const n = null;
   return {
     status, reason,
-    timings: { prepare_to_browser_ready: n, event_prepare: n, sale_open_to_first_poll: n, sale_open_to_availability: n, availability_to_selection: n, selection_to_cart_request: n, cart_request_to_cart_success: n, total_sale_open_to_cart: n },
+    timings: { prepare_to_browser_ready: n, event_prepare: n, sale_open_to_first_poll: n, sale_open_to_availability: n, availability_to_selection: n, selection_to_cart_request: n, cart_request_to_cart_success: n, total_sale_open_to_cart: n, cart_success_to_ui_ready: n, ui_ready_to_user_control: n },
     prepare: { prepareToBrowserMs: n, eventPrepareMs: n },
     metrics: { claudeCallsInCriticalPath: 0, claudeCallsTotal: 0, claudeDenied: 0, calls: newCounts(), networkOperations: 0, retries: 0, rateLimited: 0, offersExamined: 0, polls: 0, skippedByFeed: 0, feed: "none", handoffs: 0 },
     security, blockersSeen: [], mode: "refused",

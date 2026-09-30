@@ -13,6 +13,8 @@ export const EVENTS = [
   "T_OFFER_SELECTED",
   "T_CART_REQUEST",
   "T_CART_SUCCESS",
+  "T_UI_READY",
+  "T_USER_CONTROL",
 ] as const;
 export type TimelineEvent = (typeof EVENTS)[number];
 
@@ -58,6 +60,8 @@ export interface InstantTimings {
   selection_to_cart_request: number | null;
   cart_request_to_cart_success: number | null;
   total_sale_open_to_cart: number | null;
+  cart_success_to_ui_ready: number | null;
+  ui_ready_to_user_control: number | null;
 }
 
 export function timingsOf(tl: Timeline): InstantTimings {
@@ -70,5 +74,7 @@ export function timingsOf(tl: Timeline): InstantTimings {
     selection_to_cart_request: tl.between("T_OFFER_SELECTED", "T_CART_REQUEST"),
     cart_request_to_cart_success: tl.between("T_CART_REQUEST", "T_CART_SUCCESS"),
     total_sale_open_to_cart: tl.between("T_SALE_START", "T_CART_SUCCESS"),
+    cart_success_to_ui_ready: tl.between("T_CART_SUCCESS", "T_UI_READY"),
+    ui_ready_to_user_control: tl.between("T_UI_READY", "T_USER_CONTROL"),
   };
 }

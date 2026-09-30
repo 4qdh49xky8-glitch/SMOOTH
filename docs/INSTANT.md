@@ -71,3 +71,15 @@ jeton, `Authorization`, secret, donnée bancaire, URL à identifiants (assainiss
 `tests/instant.test.ts` (14 scénarios sur adaptateur scripté, décomptes d'appels, horodatages, Retry-After, flux officiel, critères compilés,
 Claude, rapport), `tests/instantCommand.test.ts` (chaîne `sale:instant`, exclusion mutuelle, refus, cœur gelé, ordre des garde-fous),
 `tests/instantBrowser.test.ts` (vrai Chromium local + faux site : préparation avant T0, rapport de latence, file, CAPTCHA, complet, limite).
+
+## Passage de main CART_SUCCESS → paiement manuel
+
+Couche `src/instant/handoff.ts` (aucun fichier du cœur gelé modifié). Dès que le cœur a validé le panier (relecture faite par le cœur) :
+
+1. surveillance arrêtée (`monitor.stop()`), garde de paiement levé (`onFinish`) ;
+2. la page **déjà ouverte** est ramenée au premier plan (`bringToFront`) — aucune navigation, aucun nouvel onglet, aucun appel à Claude ;
+3. bannière `CART_SUCCESS` / `PAYMENT_REQUIRED` / `PAYMENT_MANUAL`, avant le tableau de bord détaillé ;
+4. le navigateur n'est **jamais fermé** après CART_SUCCESS (même avec `--exit-when-done`) : il est détaché et reste ouvert.
+
+Mesures : `cart_success_to_ui_ready` (T_CART_SUCCESS → T_UI_READY) et `ui_ready_to_user_control` (T_UI_READY → T_USER_CONTROL) dans le tableau de bord.
+Le bot ne lit ni champ de carte, ni CVV/CVC, ne remplit ni ne clique rien sur la page de paiement et ne contacte aucune banque ; 3-D Secure, CAPTCHA, authentification et limites d'achat restent à la main de l'utilisateur.

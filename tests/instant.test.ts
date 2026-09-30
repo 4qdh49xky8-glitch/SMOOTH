@@ -52,6 +52,7 @@ interface Scenario {
   deps?: Partial<InstantSaleDeps>;
   config?: Record<string, unknown>;
   customize?: (a: ScriptedSaleAdapter) => void;
+  exitWhenDone?: boolean;
 }
 interface Outcome {
   res: InstantSaleResult;
@@ -76,7 +77,7 @@ async function scenario(s: Scenario): Promise<Outcome> {
   }));
   const stub = stubSession();
   const lines: string[] = [];
-  const res = await runInstantSale({ target: file }, { adapters: [adapter], session: stub.session, print: (l) => void lines.push(l), locksDir: join(dir, "locks"), authCheckIntervalMs: 50, ...(s.deps ?? {}) });
+  const res = await runInstantSale({ target: file, exitWhenDone: s.exitWhenDone }, { adapters: [adapter], session: stub.session, print: (l) => void lines.push(l), locksDir: join(dir, "locks"), authCheckIntervalMs: 50, ...(s.deps ?? {}) });
   return { res, adapter, lines, t0, locksDir: join(dir, "locks"), stub };
 }
 const c = (o: Outcome, k: keyof ReturnType<typeof newCounts>): number => o.res.report.metrics.calls[k];
@@ -163,7 +164,7 @@ test("7 · addToCart réussit : CART_SUCCESS, panier VÉRIFIÉ, horodatages dans
   assert.ok(t.selection_to_cart_request! < 15, "le cœur ne perd pas de temps entre sélection et ajout");
   const sum = t.sale_open_to_availability! + t.availability_to_selection! + t.selection_to_cart_request! + t.cart_request_to_cart_success!;
   assert.ok(Math.abs(sum - t.total_sale_open_to_cart!) < 2, "les étapes se somment au total");
-  assert.match(o.res.dashboard, /STATUS: CART_SUCCESS[\s\S]*TIMING:[\s\S]*PERFORMANCE:[\s\S]*SECURITY:[\s\S]*payment\s+MANUAL[\s\S]*CART_SUCCESS\nPayment remains manual\./);
+  assert.match(o.res.dashboard, /STATUS: CART_SUCCESS[\s\S]*TIMING:[\s\S]*PERFORMANCE:[\s\S]*SECURITY:[\s\S]*payment\s+MANUAL[\s\S]*CART_SUCCESS\nPAYMENT_REQUIRED\nPAYMENT_MANUAL\nPayment remains manual\./);
   assert.deepEqual(o.stub.calls.filter((x) => x !== "route" && x !== "unroute"), ["detach"], "le navigateur reste OUVERT (détaché, pas fermé)");
   assert.ok(o.stub.calls.includes("unroute"), "le garde de paiement est levé à la fin (paiement manuel)");
   assert.deepEqual(readdirSync(o.locksDir).filter((f) => f.endsWith(".lock")), [], "verrous libérés");
@@ -464,4 +465,68 @@ test("RAPPORT INSTANT SALE PERFORMANCE (fixture scriptée) — mesures par étap
   assert.equal(r.metrics.retries, 0);
   assert.ok(r.security.payment === "MANUAL" && r.security.channel === "browser");
   assert.match(report, /ne disent rien de la vitesse d'un achat réel/);
+});
+
+// ───────────────────────────── passage de main CART_SUCCESS → utilisateur (paiement 100 % manuel) ─────────────────────────────
+/** Page espion : enregistre TOUT accès autre que bringToFront (navigation, champs, clic, évaluation, nouvel onglet, fermeture…). */
+const spyPage = () => {
+  const touched: string[] = [];
+  let front = 0;
+  const page = new Proxy({}, {
+    get: (_t, k: string) => {
+      if (k === "bringToFront") return async () => void front++;
+      if (k === "then") return undefined;
+      touched.push(k);
+      return async () => undefined;
+    },
+  });
+  return { page, touched, front: () => front };
+};
+
+test("H1 · CART_SUCCESS → passage de main : bannière CART_SUCCESS/PAYMENT_REQUIRED/PAYMENT_MANUAL, durées mesurées, AUCUNE autre interaction avec la page", async () => {
+  const spy = spyPage();
+  const stub = stubSession();
+  const o = await scenario({
+    frame: () => ({ open: true, offers: [GOOD()] }),
+    adapter: { selectMs: 5, addMs: 10, cartMs: 5 },
+    deps: { session: { ...stub.session, page: spy.page as never } },
+  });
+  assert.equal(o.res.report.status, "CART_SUCCESS");
+  const text = o.lines.join("\n");
+  assert.match(text, /CART_SUCCESS\nPAYMENT_REQUIRED\nPAYMENT_MANUAL/);
+  const idx = (re: RegExp): number => o.lines.findIndex((l) => re.test(l));
+  assert.ok(idx(/^PAYMENT_MANUAL$/) < idx(/^STATUS:/), "la bannière précède le tableau de bord détaillé");
+  const t = o.res.report.timings;
+  assert.ok(typeof t.cart_success_to_ui_ready === "number" && t.cart_success_to_ui_ready >= 0 && t.cart_success_to_ui_ready < 100, `CART_SUCCESS → UI prête : ${t.cart_success_to_ui_ready} ms`);
+  assert.ok(typeof t.ui_ready_to_user_control === "number" && t.ui_ready_to_user_control >= 0 && t.ui_ready_to_user_control < 100, `UI prête → contrôle : ${t.ui_ready_to_user_control} ms`);
+  assert.match(o.res.dashboard, /cart_success_to_ui_ready\s+[\d.]+ ms[\s\S]*ui_ready_to_user_control\s+[\d.]+ ms/);
+  const tl = TL(o);
+  assert.ok(tl.T_CART_SUCCESS! <= tl.T_UI_READY! && tl.T_UI_READY! <= tl.T_USER_CONTROL!);
+  // la page déjà ouverte est simplement ramenée au premier plan : pas de navigation, pas d'onglet, pas de champ lu, pas de clic, pas de fermeture
+  assert.ok(spy.front() >= 1, "page au premier plan");
+  assert.deepEqual(spy.touched.filter((k) => !["url", "isClosed"].includes(k)), [], `interactions inattendues avec la page : ${spy.touched.join(",")}`);
+  assert.equal(o.res.report.metrics.claudeCallsTotal, 0, "aucun appel à Claude");
+  // aucune opération réseau après la relecture du panier (surveillance arrêtée, aucune navigation, aucun paiement)
+  const lastCart = Math.max(...o.adapter.ops.filter((x) => x.op === "getCartState").map((x) => x.at));
+  assert.ok(o.adapter.ops.every((x) => x.at <= lastCart + 1), "aucune opération d'adaptateur après la dernière vérification du panier");
+  assert.ok(!o.stub.calls.includes("shutdown"));
+});
+
+test("H2 · même avec exitWhenDone, le navigateur n'est JAMAIS fermé après CART_SUCCESS (détaché, ouvert) ; il l'est en cas d'échec", async () => {
+  const won = await scenario({ frame: () => ({ open: true, offers: [GOOD()] }), exitWhenDone: true });
+  assert.equal(won.res.report.status, "CART_SUCCESS");
+  assert.ok(won.stub.calls.includes("detach") && !won.stub.calls.includes("shutdown"), "aucune fermeture à CART_SUCCESS");
+  const lost = await scenario({ frame: () => ({ open: true, soldOut: true }), maxWaitS: 1, exitWhenDone: true });
+  assert.notEqual(lost.res.report.status, "CART_SUCCESS");
+  assert.ok(lost.stub.calls.includes("shutdown"), "comportement inchangé hors succès");
+});
+
+test("H3 · pas de passage de main hors succès : SOLD_OUT / panier incohérent n'affichent ni PAYMENT_REQUIRED ni UI prête", async () => {
+  const bad = await scenario({ frame: () => ({ open: true, offers: [GOOD()] }), adapter: { cartQuantity: (q) => q - 1 } });
+  assert.notEqual(bad.res.report.status, "CART_SUCCESS");
+  assert.ok(!bad.lines.some((l) => /^PAYMENT_(REQUIRED|MANUAL)$/.test(l)));
+  assert.equal(bad.res.timeline.T_UI_READY, undefined);
+  assert.equal(bad.res.report.timings.cart_success_to_ui_ready, null);
+  const sold = await scenario({ frame: () => ({ open: true, soldOut: true }), maxWaitS: 1 });
+  assert.ok(!sold.lines.some((l) => /^PAYMENT_(REQUIRED|MANUAL)$/.test(l)));
 });

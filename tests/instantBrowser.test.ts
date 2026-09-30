@@ -115,3 +115,18 @@ t("Chromium réel : CAPTCHA, vente complète, limite d'achat — jamais contourn
   assert.equal(limit.fx.state.cart.length, 0);
   assert.equal(limit.fx.state.paymentHits, 0);
 });
+
+t("Chromium réel : passage de main CART_SUCCESS → utilisateur — aucune requête bancaire, aucune navigation hors fixture, aucun paiement, durées mesurées", async () => {
+  const { res, fx, lines } = await run({ scenario: "contention" }, 8000);
+  assert.equal(res.report.status, "CART_SUCCESS", lines.join("\n"));
+  const tm = res.report.timings;
+  assert.ok(tm.cart_success_to_ui_ready! >= 0 && tm.cart_success_to_ui_ready! < 500, `CART_SUCCESS → UI prête ${tm.cart_success_to_ui_ready} ms`);
+  assert.ok(tm.ui_ready_to_user_control! >= 0 && tm.ui_ready_to_user_control! < 500, `UI prête → contrôle ${tm.ui_ready_to_user_control} ms`);
+  assert.match(lines.join("\n"), /CART_SUCCESS\nPAYMENT_REQUIRED\nPAYMENT_MANUAL/);
+  assert.equal(fx.state.paymentHits, 0, "aucune requête vers le paiement / une banque");
+  assert.ok(!fx.state.requests.some((x) => /payment|card|cvv|cvc|3ds|bank/i.test(x)), "aucune requête de type paiement/carte/banque");
+  assert.equal(fx.state.requests.at(-1), "GET /cart", "la dernière requête est la vérification du panier : plus aucune navigation ensuite");
+  assert.equal(fx.state.requests.filter((x) => /^GET \/(event|account|login)/.test(x) && fx.state.requests.lastIndexOf(x) > fx.state.requests.lastIndexOf("GET /cart")).length, 0);
+  assert.equal(res.report.metrics.claudeCallsTotal, 0);
+  console.log(`CART_SUCCESS → UI prête : ${tm.cart_success_to_ui_ready} ms · UI prête → contrôle utilisateur : ${tm.ui_ready_to_user_control} ms`);
+});
