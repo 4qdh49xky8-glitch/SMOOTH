@@ -38,6 +38,18 @@ behavior:
   autoAddToCart: true
   autoPayment: false             # doit rester false : le paiement est toujours manuel
 
+# Notification e-mail immédiate après un CART_SUCCESS vérifié (sale:instant uniquement ; voir docs/INSTANT.md). Sous `advanced` car le profil
+# générique n'accepte pas de clé `notifications` à la racine. Aucun secret ici : seulement les NOMS des variables d'environnement
+# (à définir dans votre shell : NOTIFICATION_EMAIL, SMTP_USER, SMTP_PASS). Adaptez `from` et `smtp.host` à VOTRE fournisseur d'envoi (valeurs d'exemple).
+advanced:
+  notifications:
+    email:
+      enabled: true
+      toEnv: NOTIFICATION_EMAIL          # adresse lue dans cette variable d'environnement : aucune adresse personnelle dans le dépôt
+      on: CART_SUCCESS
+      provider: smtp
+      from: "bot@example.org"            # EXEMPLE : adresse d'expéditeur autorisée par votre fournisseur
+      smtp: { host: "smtp.example.org", port: 587, secure: false, userEnv: SMTP_USER, passEnv: SMTP_PASS }
+
 # channel: auto                  # facultatif : auto | official-api | browser | human — ne peut QUE restreindre les permissions
-# advanced:                      # facultatif : timing, browser, cart, claude, notifications, telemetry, logging, siteOptions
-#   timing: { preArmSeconds: 90 }
+#   (autres réglages facultatifs sous `advanced` : timing, browser, cart, claude, telemetry, logging, siteOptions — ex. timing: { preArmSeconds: 90 })

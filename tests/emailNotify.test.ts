@@ -115,3 +115,42 @@ test("échec SMTP réel (port fermé) : FAILED sans exception et sans détail ; 
   assert.equal(await sendBounded(new MockMailer("hang").mailer, msg, 300), "FAILED");
   assert.ok(Date.now() - t < 1000);
 });
+
+test("profil de vente générique config/sale.example.yaml : destinataire par toEnv (variable NOTIFICATION_EMAIL), aucune adresse ni secret dans le dépôt", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { execSync } = await import("node:child_process");
+  const { loadConfig } = await import("../src/config/load.js");
+  const f = "config/sale.example.yaml";
+  loadConfig(f); // le profil reste valide pour le schéma standard (la clé e-mail y est ignorée)
+  const env = { NOTIFICATION_EMAIL: "destinataire@example.net", SMTP_USER: "u-demo", SMTP_PASS: "p-demo-xxxx" } as NodeJS.ProcessEnv;
+  const c = readEmailConfig(f, env)!;
+  assert.equal(c.to, "destinataire@example.net", "valeur lue UNIQUEMENT depuis la variable d'environnement");
+  assert.equal(c.on, "CART_SUCCESS");
+  assert.deepEqual([c.smtp!.userEnv, c.smtp!.passEnv], ["SMTP_USER", "SMTP_PASS"]);
+  // la valeur change avec l'environnement : rien n'est figé dans le fichier
+  assert.equal(readEmailConfig(f, { ...env, NOTIFICATION_EMAIL: "autre@example.net" })!.to, "autre@example.net");
+  // variable absente ou vide → refus propre (message sans valeur secrète)
+  for (const bad of [{ SMTP_USER: "u", SMTP_PASS: "p" }, { NOTIFICATION_EMAIL: "", SMTP_USER: "u", SMTP_PASS: "p" }]) {
+    assert.throws(() => readEmailConfig(f, bad as NodeJS.ProcessEnv), (e: unknown) => e instanceof EmailConfigError && /NOTIFICATION_EMAIL absente/.test(e.message));
+  }
+  // valeur invalide dans la variable → refus
+  assert.throws(() => readEmailConfig(f, { ...env, NOTIFICATION_EMAIL: "pas-une-adresse" }), EmailConfigError);
+  // le fichier ne contient ni adresse e-mail réelle ni secret (seules les adresses d'exemple example.org sont admises)
+  const text = readFileSync(f, "utf8").replace(/^\s*#.*$/gm, "");
+  assert.match(text, /toEnv:\s*NOTIFICATION_EMAIL/);
+  assert.ok(!/^\s*to:/m.test(text), "pas de destinataire en clair");
+  assert.ok(!/pass(word)?\s*:|token\s*:|secret|apikey/i.test(text), "aucun secret en clair");
+  // aucun fichier versionné ne contient d'adresse e-mail personnelle : seules les adresses réservées aux exemples (example.*) sont tolérées
+  const files = execSync("git ls-files", { encoding: "utf8" }).split("\n").filter((x) => x && !/package-lock\.json$|\.(png|jpg|ico)$/.test(x));
+  const personal: string[] = [];
+  for (const file of files) {
+    let t = "";
+    try {
+      t = readFileSync(file, "utf8");
+    } catch {
+      continue;
+    }
+    for (const m of t.matchAll(/[A-Za-z0-9._%+-]+@(?:icloud|gmail|hotmail|outlook|yahoo|live|proton(?:mail)?|me)\.(?:com|fr|me|net)\b/gi)) personal.push(`${file}: ${m[0]}`);
+  }
+  assert.deepEqual(personal, [], "adresse personnelle dans un fichier versionné");
+});
