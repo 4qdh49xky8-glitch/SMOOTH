@@ -29,7 +29,8 @@
     "platform": "tsx src/index.ts platform",
     "doctor": "tsx src/index.ts doctor",
     "sale:check": "tsx src/index.ts sale check",
-    "sale:wait": "tsx src/index.ts sale wait"
+    "sale:wait": "tsx src/index.ts sale wait",
+    "sale:instant": "tsx src/index.ts sale instant"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",

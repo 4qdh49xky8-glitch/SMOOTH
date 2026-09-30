@@ -26,6 +26,7 @@ et laisse le navigateur ouvert pour que vous vérifiiez et payiez vous-même.
 | `npm run sites` | liste les adaptateurs, leur base d'autorisation et l'état de leur contrat |
 | `npm run sale:check -- --config config/sale.yaml` | **READY / NOT_READY** d'une vente (profil générique YAML/JSON), sans contacter la plateforme |
 | `npm run sale:wait -- --config config/sale.yaml` | mode attente : contrôle, attente locale (réévaluée), lancement, panier, arrêt à `CART_SUCCESS` (`--human` : rappels seulement) |
+| `npm run sale:instant -- --config config/sale.yaml` | **INSTANT-ON-SALE** : tout préparé avant T0, chemin critique minimal jusqu'au panier, mesures et tableau de bord (même avant-vente et mêmes verrous que `sale:wait`) |
 | `npm run test:fixtures` | kit de fixtures + contrat d'adaptateur : scénarios locaux (TEST_ONLY · NOT_A_REAL_PLATFORM) |
 | `npm run test:adapters` | vérifie automatiquement que **chaque** adaptateur respecte le contrat (`ADAPTER=<id>` pour un seul) |
 | `npm run validate -- config/event.json` | valide une configuration **sans contacter aucun site** (`-- concert` pour un profil, `-- --all` pour tous) |
@@ -95,6 +96,7 @@ Détail : [docs/SECURITY.md](docs/SECURITY.md).
 
 | Document | Contenu |
 |----------|---------|
+| [docs/INSTANT.md](docs/INSTANT.md) | **INSTANT-ON-SALE** : préparation avant T0, `SaleMonitor`, critères compilés, mesures, Claude hors chemin critique |
 | [docs/SALE.md](docs/SALE.md) | **mode READY FOR SALE** : profil de vente générique, stratégies, rangées, fuseaux, `sale:check`, `sale:wait` |
 | [docs/ADAPTER_CONTRACT.md](docs/ADAPTER_CONTRACT.md) | **contrat d'adaptateur** : déclarations (authorization, allowedHosts, channel, capabilities), sept capacités, états, ApiClient, interdits |
 | [docs/FIXTURES.md](docs/FIXTURES.md) | **fixtures locales** pour tester un futur adaptateur : scénarios, faux site, suites de conformité (TEST_ONLY) |

@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { doctorCommand } from "./cli/doctor.js";
 import { liveCommand, type LiveDeps } from "./cli/live.js";
+import { saleInstantCommand } from "./cli/instant.js";
 import { saleCheckCommand, saleWaitCommand } from "./cli/sale.js";
 import { simulateCommand } from "./cli/simulate.js";
 import { sitesCommand } from "./cli/sites.js";
@@ -26,6 +27,7 @@ Adaptateurs et configuration
   sale check                     READY / NOT_READY d'une vente, sans contacter la plateforme           (npm run sale:check -- --config sale.yaml)
   sale wait                      Mode attente : contrôle, attente locale, remise au lancement → panier (npm run sale:wait -- --config sale.yaml)
                                  --human : rappels seulement, aucun automatisme
+  sale instant                   INSTANT-ON-SALE : tout est préparé avant T0, chemin critique minimal jusqu'au panier (npm run sale:instant -- --config sale.yaml)
   platforms                      Tableau interne des plateformes candidates (preuves officielles, verdicts)  (npm run platforms)
                                  --check : cohérence du catalogue · --hosts : domaines officiels à autoriser · --json
 
@@ -83,7 +85,9 @@ export async function main(argv: string[] = process.argv.slice(2), deps: LiveDep
       if (arg === "check") return saleCheckCommand(common);
       if (arg === "wait")
         return saleWaitCommand({ ...common, logLevel: values["log-level"], logFile: values["log-file"], exitWhenDone: values["exit-when-done"], trace: values.trace, recheckSeconds: values["recheck-seconds"] ? Number(values["recheck-seconds"]) : undefined }, { live: deps });
-      console.log("Usage : sale check|wait [--config <fichier>] [--human] [--json]");
+      if (arg === "instant")
+        return saleInstantCommand({ target: common.target, logLevel: values["log-level"], logFile: values["log-file"], exitWhenDone: values["exit-when-done"], recheckSeconds: values["recheck-seconds"] ? Number(values["recheck-seconds"]) : undefined, human: values.human }, { live: deps });
+      console.log("Usage : sale check|wait|instant [--config <fichier>] [--human (check|wait)] [--json]");
       return 1;
     }
     case "profiles": {
