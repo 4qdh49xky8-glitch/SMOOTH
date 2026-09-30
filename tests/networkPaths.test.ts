@@ -135,7 +135,9 @@ const filesMatching = (re: RegExp): string[] => [...code].filter(([, c]) => re.t
 
 test("inventaire : les SEULS fichiers qui peuvent toucher le réseau sont connus — toute nouvelle entrée doit être examinée ici", () => {
   // fetch : client API encadré · CDP local (boucle locale) · webhook de notification choisi par l'utilisateur (texte assaini) · en-tête Date du site après autorisation
-  assert.deepEqual(filesMatching(/(?<![.\w])fetch\(|\?\? fetch\b/), ["src/api/ApiClient.ts", "src/browser/launch.ts", "src/notifications/notify.ts", "src/utils/clock.ts"]);
+  assert.deepEqual(filesMatching(/(?<![.\w])fetch\(|\?\? fetch\b/), ["src/api/ApiClient.ts", "src/browser/launch.ts", "src/instant/emailNotify.ts", "src/notifications/notify.ts", "src/utils/clock.ts"]);
+  // e-mail (sale:instant) : fournisseur SMTP/API choisi EXPLICITEMENT par l'utilisateur, message assaini, une fois après CART_SUCCESS — seul importeur de nodemailer
+  assert.deepEqual(filesMatching(/from "nodemailer"/), ["src/instant/emailNotify.ts"]);
   // navigation de page : adaptateurs (gardés par installNetworkGuards) et la connexion manuelle de `login`
   assert.deepEqual(filesMatching(/\.goto\(/), ["src/cli/live.ts", "src/sites/BaseSiteAdapter.ts", "src/sites/ExampleSite.ts"]);
   // création de navigateur / contexte / page : un seul fichier

@@ -83,3 +83,25 @@ Couche `src/instant/handoff.ts` (aucun fichier du cœur gelé modifié). Dès qu
 
 Mesures : `cart_success_to_ui_ready` (T_CART_SUCCESS → T_UI_READY) et `ui_ready_to_user_control` (T_UI_READY → T_USER_CONTROL) dans le tableau de bord.
 Le bot ne lit ni champ de carte, ni CVV/CVC, ne remplit ni ne clique rien sur la page de paiement et ne contacte aucune banque ; 3-D Secure, CAPTCHA, authentification et limites d'achat restent à la main de l'utilisateur.
+
+## Notification e-mail immédiate (optionnelle)
+
+Couche `src/instant/emailNotify.ts` (aucun fichier du cœur gelé modifié : le schéma standard ignore la clé, elle est lue et validée ici).
+
+```yaml
+notifications:
+  email:
+    enabled: true
+    to: "vous@exemple.org"     # ou toEnv: NOM_DE_VARIABLE ; une seule adresse
+    on: "CART_SUCCESS"         # seul événement pris en charge
+    provider: smtp             # smtp | api — aucun fournisseur par défaut
+    from: "bot@exemple.org"
+    smtp: { host: smtp.exemple.org, port: 587, userEnv: SMTP_USER, passEnv: SMTP_PASS }   # NOMS de variables, jamais les valeurs
+    # api: { url: "https://api.exemple.org/v1/send", tokenEnv: MAIL_TOKEN }               # https, sans identifiants ni requête
+```
+
+- Une configuration invalide (adresse, fournisseur, variable absente, clé inconnue…) est **refusée avant toute attente ou requête**.
+- Enchaînement : `CART_SUCCESS` (panier vérifié par le cœur) → surveillance arrêtée → message préparé → envoi lancé **sans attente** → passage de main → navigateur ouvert. Un seul envoi par `CART_SUCCESS` ; aucun envoi sur un autre statut.
+- Contenu strictement limité à : `CART_SUCCESS`, événement, plateforme, date de l'événement, quantité, catégorie/section, prix total, heure exacte, `PAYMENT REQUIRED — PAYMENT MANUAL`. Les champs libres sont assainis (pas d'URL, de jeton, de saut de ligne) et un garde final refuse tout texte ressemblant à un secret, une carte, un CVV/CVC, un cookie ou une URL.
+- Échec, lenteur ou blocage du serveur : `CART_SUCCESS` reste un succès ; affichage `CART_SUCCESS — EMAIL_NOTIFICATION_FAILED` (sans détail de l'erreur) ; envoi borné à 10 s, qui ne retarde jamais le navigateur.
+- Tests : double local `MockMailer` (`testkit/mockMailer.ts`) et faux serveur SMTP en boucle locale (`tests/helpers/fakeSmtp.ts`) — aucun vrai serveur n'est contacté.

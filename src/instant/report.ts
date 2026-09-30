@@ -38,6 +38,8 @@ export interface InstantReport {
   security: InstantSecurity;
   blockersSeen: string[];
   mode: string;
+  /** Notification e-mail après CART_SUCCESS : SENT | FAILED | DISABLED (n'influence jamais le statut). */
+  notification?: "SENT" | "FAILED" | "DISABLED";
 }
 
 const ms = (v: number | null | undefined): string => (v === null || v === undefined ? "—" : `${v} ms`);

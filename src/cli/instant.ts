@@ -1,4 +1,5 @@
 import { runInstantSale, type InstantSaleDeps } from "../instant/runner.js";
+import { EmailConfigError, readEmailConfig } from "../instant/emailNotify.js";
 import { saleWaitCommand, type SaleWaitArgs, type SaleWaitDeps } from "./sale.js";
 
 /**
@@ -13,6 +14,13 @@ export async function saleInstantCommand(a: SaleWaitArgs, d: { wait?: SaleWaitDe
   const print = d.wait?.print ?? ((l: string) => console.log(l));
   if (a.human) {
     print("SALE INSTANT : le mode humain n'a rien à automatiser — utilisez `sale:wait --human` (rappels seulement). Refusé.");
+    return 1;
+  }
+  try {
+    if (a.target && !d.runner?.emailConfig) readEmailConfig(a.target); // configuration e-mail invalide → refus AVANT toute attente ou requête
+  } catch (e) {
+    if (!(e instanceof EmailConfigError)) throw e;
+    print(`SALE INSTANT : ${e.message}. Refusé.`);
     return 1;
   }
   return saleWaitCommand(a, {

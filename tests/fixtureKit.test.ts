@@ -134,7 +134,7 @@ test("le kit ne peut atteindre que la boucle locale : le serveur n'écoute que s
   const { readFileSync, readdirSync } = await import("node:fs");
   const { stripComments } = await import("../src/sites/contract.js");
   const files = readdirSync("testkit").filter((f) => f.endsWith(".ts"));
-  assert.deepEqual(files.sort(), ["apiAdapterSuite.ts", "browserAdapterSuite.ts", "fakeApi.ts", "fixtureSite.ts", "scenarios.ts", "scriptedSale.ts"]);
+  assert.deepEqual(files.sort(), ["apiAdapterSuite.ts", "browserAdapterSuite.ts", "fakeApi.ts", "fixtureSite.ts", "mockMailer.ts", "scenarios.ts", "scriptedSale.ts"]);
   for (const f of files) {
     const code = stripComments(readFileSync(`testkit/${f}`, "utf8"));
     assert.ok(!/\bfetch\(|node:https["']|axios|WebSocket|node:net["']|node:tls["']|XMLHttpRequest/.test(code), `${f} : primitive réseau`);

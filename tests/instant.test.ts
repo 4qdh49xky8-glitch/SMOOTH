@@ -13,6 +13,8 @@ import { ConfigSchema } from "../src/config/schema.js";
 import { SelectorNotFoundError, RateLimitedError } from "../src/utils/errors.js";
 import type { Catalog } from "../src/platforms/catalog.js";
 import type { AdapterContext, Blocker, Offer } from "../src/sites/SiteAdapter.js";
+import { MockMailer } from "../testkit/mockMailer.js";
+import type { EmailConfig } from "../src/instant/emailNotify.js";
 import { ScriptedSaleAdapter, type SaleFrame, type ScriptedSaleOptions } from "../testkit/scriptedSale.js";
 import { acquireEventLock } from "../src/utils/lock.js";
 import { lockKeysFor } from "../src/sale/lockKeys.js";
@@ -529,4 +531,95 @@ test("H3 · pas de passage de main hors succès : SOLD_OUT / panier incohérent 
   assert.equal(bad.res.report.timings.cart_success_to_ui_ready, null);
   const sold = await scenario({ frame: () => ({ open: true, soldOut: true }), maxWaitS: 1 });
   assert.ok(!sold.lines.some((l) => /^PAYMENT_(REQUIRED|MANUAL)$/.test(l)));
+});
+
+// ───────────────────────────── notification e-mail après CART_SUCCESS ─────────────────────────────
+const EMAIL: EmailConfig = { enabled: true, to: "moi@example.org", on: "CART_SUCCESS", provider: "smtp", from: "bot@example.org", smtp: { host: "127.0.0.1", port: 2525, secure: false } };
+const GOOD_FRAME = () => ({ open: true, offers: [GOOD()] });
+
+test("E1 · e-mail envoyé après CART_SUCCESS vérifié : contenu exact, heure du CART_SUCCESS, une seule fois (notification mockée)", async () => {
+  const m = new MockMailer("ok");
+  const o = await scenario({ frame: GOOD_FRAME, deps: { emailConfig: EMAIL, mailer: m.mailer } });
+  assert.equal(o.res.report.status, "CART_SUCCESS");
+  assert.equal(m.calls, 1, "exactement un envoi par CART_SUCCESS");
+  assert.equal(m.sent.length, 1);
+  const { text, subject, to } = m.sent[0]!;
+  assert.equal(to, "moi@example.org");
+  assert.match(subject, /^CART_SUCCESS — /);
+  assert.match(text, /^CART_SUCCESS\n/);
+  assert.match(text, /Événement : Événement générique/);
+  assert.match(text, /Plateforme : /);
+  assert.match(text, /Quantité : 2/);
+  assert.match(text, /Catégorie \/ section : Cat A/);
+  assert.match(text, /Prix total : 200 EUR/);
+  assert.ok(text.includes(`Heure du CART_SUCCESS : ${new Date(TL(o).T_CART_SUCCESS!).toISOString()}`));
+  assert.ok(text.endsWith("PAYMENT REQUIRED — PAYMENT MANUAL"));
+  assert.equal(o.res.report.notification, "SENT");
+  assert.ok(o.lines.includes("EMAIL_NOTIFICATION_SENT"));
+});
+
+test("E2 · AUCUN e-mail avant CART_SUCCESS ni hors succès (vente fermée, épuisée, panier incohérent, file, captcha)", async () => {
+  const m = new MockMailer("ok");
+  let atSuccess = -1;
+  const o = await scenario({ frame: GOOD_FRAME, deps: { emailConfig: EMAIL, mailer: async (x) => ((atSuccess = Date.now()), m.mailer(x)) } });
+  assert.ok(atSuccess >= TL(o).T_CART_SUCCESS!, "l'envoi commence APRÈS le CART_SUCCESS");
+  for (const [name, sc] of Object.entries({
+    fermée: { frame: () => ({ open: false }), maxWaitS: 1 },
+    épuisée: { frame: () => ({ open: true, soldOut: true }), maxWaitS: 1 },
+    incohérent: { frame: GOOD_FRAME, adapter: { cartQuantity: (q: number) => q - 1 } },
+  } as Record<string, Partial<Scenario> & { frame: Scenario["frame"] }>)) {
+    const n = new MockMailer("ok");
+    const r = await scenario({ ...sc, deps: { emailConfig: EMAIL, mailer: n.mailer } });
+    assert.notEqual(r.res.report.status, "CART_SUCCESS", name);
+    assert.equal(n.calls, 0, `aucun e-mail : ${name}`);
+    assert.equal(r.res.report.notification, "DISABLED");
+  }
+  const cap = new MockMailer("ok");
+  const c = await scenario({ frame: () => ({ open: true, blocker: { state: "CAPTCHA", message: "captcha" } as Blocker }), maxWaitS: 1, deps: { emailConfig: EMAIL, mailer: cap.mailer, awaitHuman: async () => { throw new Error("humain indisponible"); } } });
+  assert.notEqual(c.res.report.status, "CART_SUCCESS");
+  assert.equal(cap.calls, 0);
+});
+
+test("E3 · échec / lenteur / blocage du SMTP : NON bloquant, CART_SUCCESS reste un succès, message EMAIL_NOTIFICATION_FAILED", async () => {
+  const fail = new MockMailer("fail");
+  const a = await scenario({ frame: GOOD_FRAME, deps: { emailConfig: EMAIL, mailer: fail.mailer } });
+  assert.equal(a.res.report.status, "CART_SUCCESS");
+  assert.equal(a.res.code, 0);
+  assert.equal(a.res.report.notification, "FAILED");
+  assert.ok(a.lines.includes("CART_SUCCESS — EMAIL_NOTIFICATION_FAILED"));
+  assert.ok(!a.lines.join("\n").includes("SMTP 421"), "détail de l'erreur jamais affiché");
+  // serveur bloqué : le passage de main est affiché AVANT le délai d'envoi, le navigateur est déjà rendu
+  const hang = new MockMailer("hang");
+  const stamps: Record<string, number> = {};
+  const t0 = Date.now();
+  const b = await scenario({ frame: GOOD_FRAME, deps: { emailConfig: EMAIL, mailer: hang.mailer, emailTimeoutMs: 700, onEvent: (e, at) => void (stamps[e] = at) } });
+  assert.equal(b.res.report.status, "CART_SUCCESS");
+  assert.equal(b.res.report.notification, "FAILED");
+  assert.ok(b.res.timeline.T_USER_CONTROL! - b.res.timeline.T_CART_SUCCESS! < 100, "contrôle utilisateur disponible sans attendre le serveur");
+  assert.ok(b.res.report.timings.cart_success_to_ui_ready! < 100);
+  assert.ok(Date.now() - t0 >= 700, "seule la fin de la fonction attend (bornée), pas le passage de main");
+  assert.match(b.lines.join("\n"), /PAYMENT_MANUAL[\s\S]*EMAIL_NOTIFICATION_FAILED/, "bannière de paiement AVANT le résultat de l'e-mail");
+  void stamps;
+  // lent : même chose
+  const slow = new MockMailer("slow", 400);
+  const c = await scenario({ frame: GOOD_FRAME, deps: { emailConfig: EMAIL, mailer: slow.mailer, emailTimeoutMs: 5000 } });
+  assert.ok(c.res.report.timings.ui_ready_to_user_control! < 100);
+  assert.equal(c.res.report.notification, "SENT");
+  assert.match(c.lines.join("\n"), /PAYMENT_MANUAL[\s\S]*EMAIL_NOTIFICATION_SENT/);
+});
+
+test("E4 · navigateur toujours ouvert, paiement toujours manuel, aucune interaction avec la page (e-mail activé, échec compris)", async () => {
+  for (const mode of ["ok", "fail"] as const) {
+    const spy = spyPage();
+    const stub = stubSession();
+    const m = new MockMailer(mode);
+    const o = await scenario({ frame: GOOD_FRAME, exitWhenDone: true, deps: { emailConfig: EMAIL, mailer: m.mailer, session: { ...stub.session, page: spy.page as never } } });
+    assert.equal(o.res.report.status, "CART_SUCCESS");
+    assert.ok(stub.calls.includes("detach") && !stub.calls.includes("shutdown"), "navigateur laissé ouvert");
+    assert.deepEqual(spy.touched.filter((k) => !["url", "isClosed"].includes(k)), [], "aucune navigation, aucun champ, aucun clic");
+    assert.equal(o.res.report.security.payment, "MANUAL");
+    assert.match(o.lines.join("\n"), /PAYMENT_REQUIRED\nPAYMENT_MANUAL/);
+    assert.equal(o.res.report.metrics.claudeCallsTotal, 0);
+    assert.equal(o.adapter.ops.filter((x) => /pay/i.test(x.op)).length, 0);
+  }
 });

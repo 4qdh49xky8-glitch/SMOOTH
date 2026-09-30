@@ -26,6 +26,7 @@ import type { SelectorSpec } from "../selectors/resolver.js";
 import { compileSelection } from "./compile.js";
 import { SaleMonitor, instrument, newCounts } from "./monitor.js";
 import { formatDashboard, type InstantReport, type InstantStatus } from "./report.js";
+import { buildEmail, createMailer, readEmailConfig, sendBounded, EmailConfigError, type EmailConfig, type Mailer, type NotificationOutcome } from "./emailNotify.js";
 import { handOffToUser, type HandoffPage } from "./handoff.js";
 import { Timeline, timingsOf, type TimelineEvent } from "./timeline.js";
 
@@ -62,6 +63,12 @@ export interface InstantSaleDeps extends LiveDeps {
   catalogLoader?: () => import("../platforms/catalog.js").Catalog;
   /** Événements du chemin critique (journal minimal). */
   onEvent?: (e: TimelineEvent, at: number) => void;
+  /** Notification e-mail : configuration déjà validée (tests) ; défaut : lue dans le fichier (`notifications.email`). `null` = désactivée. */
+  emailConfig?: EmailConfig | null;
+  /** Expéditeur e-mail (tests : double local, aucun serveur réel) ; défaut : celui du fournisseur configuré (SMTP ou API). */
+  mailer?: Mailer;
+  /** Délai maximal de l'envoi e-mail (défaut 10 s) : n'affecte jamais le passage de main. */
+  emailTimeoutMs?: number;
 }
 
 export interface InstantSaleResult {
@@ -103,6 +110,14 @@ export async function runInstantSale(o: InstantSaleOptions, deps: InstantSaleDep
 
   // ── 1. configuration + autorisation COMPLÈTE avant tout réseau
   const config = loadConfig(o.target);
+  let email: EmailConfig | null;
+  try {
+    email = deps.emailConfig !== undefined ? deps.emailConfig : readEmailConfig(o.target);
+  } catch (e) {
+    if (!(e instanceof EmailConfigError)) throw e;
+    const report = emptyReport("REFUSED", e.message, { authorization: "non évaluée", channel: "—", lock: "non pris", payment: "MANUAL" });
+    return { code: 1, report, dashboard: formatDashboard(report), timeline: timeline.snapshot() };
+  }
   const profile = profileName(resolveConfigPath(o.target));
   const instance = `${profile}#${process.pid}`;
   const saleStart = Date.parse(config.sale.startTime);
@@ -214,12 +229,35 @@ export async function runInstantSale(o: InstantSaleOptions, deps: InstantSaleDep
       monitor.stop();
     }
 
+    let notification: Promise<NotificationOutcome> | undefined;
     const ok = result.status === "in-cart";
     if (!ok) timeline.clear("T_CART_SUCCESS"); // une relecture du panier n'est un succès que si le cœur l'a validé
     else {
       print(`[${rel((timeline.get("T_CART_SUCCESS") ?? wallNowFallback()) - saleStart)}] CART_SUCCESS`);
       // Passage de main immédiat : surveillance déjà arrêtée (onFinish), panier déjà revérifié par le cœur, aucune navigation.
       monitor.stop();
+      // Notification e-mail : préparée ici, envoyée SANS attendre (le passage de main ne dépend jamais d'elle) ; une seule fois.
+      if (email && result.cartOk === true && result.cart) {
+        const at = timeline.get("T_CART_SUCCESS") ?? wallNowFallback();
+        let send: Promise<NotificationOutcome>;
+        try {
+          const msg = buildEmail(email, {
+            eventName: config.event.name,
+            platform: adapter.meta.displayName,
+            eventDate: config.event.date,
+            quantity: result.cart.itemCount,
+            category: [result.offer?.category, result.offer?.section].filter(Boolean).join(" / ") || undefined,
+            totalPrice: result.cart.totalPrice,
+            currency: result.cart.currency,
+            at,
+          });
+          const mailer = deps.mailer ?? createMailer(email, process.env, deps.emailTimeoutMs ?? 10_000);
+          send = sendBounded(mailer, msg, deps.emailTimeoutMs ?? 10_000);
+        } catch {
+          send = Promise.resolve("FAILED");
+        }
+        notification = send.then((r) => (r === "SENT" ? (print("EMAIL_NOTIFICATION_SENT"), r) : (print("CART_SUCCESS — EMAIL_NOTIFICATION_FAILED"), r)));
+      }
       await handOffToUser(session?.page as HandoffPage | undefined, timeline, print);
     }
     for (const st of result.telemetry?.states ?? []) if (["QUEUE", "CAPTCHA", "BLOCKED", "LOGIN_REQUIRED"].includes(st.state)) blockersSeen.add(st.state);
@@ -255,6 +293,8 @@ export async function runInstantSale(o: InstantSaleOptions, deps: InstantSaleDep
       if (o.exitWhenDone && !ok) await session.shutdown?.(); // jamais de fermeture après CART_SUCCESS : l'utilisateur paie
       else await session.detach?.(); // le navigateur reste ouvert pour le paiement manuel
     }
+    if (notification) report.notification = await notification; // après le passage de main : attente bornée, le navigateur est déjà rendu
+    else report.notification = "DISABLED";
     return { code: ok ? 0 : 1, report, dashboard, run: result, timeline: timeline.snapshot() };
   } finally {
     monitor?.stop();

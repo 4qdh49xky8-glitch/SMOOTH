@@ -139,7 +139,7 @@ test("aucune donnée de paiement n'est capturée ni automatisée : aucun code du
   const { execSync } = require_child();
   const hits = execSync(`grep -rniE "card[-_ ]?number|cvv|cvc|iban|cardholder" src --include=*.ts -l || true`, { encoding: "utf8" }).trim().split("\n").filter(Boolean).sort();
   // Seuls les fichiers qui DÉFINISSENT des refus/assainissements peuvent nommer ces notions.
-  assert.deepEqual(hits, ["src/agent/claude.ts", "src/api/ApiClient.ts", "src/sites/contract.ts", "src/utils/redact.ts"], hits.join(", "));
+  assert.deepEqual(hits, ["src/agent/claude.ts", "src/api/ApiClient.ts", "src/instant/emailNotify.ts", "src/sites/contract.ts", "src/utils/redact.ts"], hits.join(", "));
   const fills = execSync(`grep -rnE "\\.(fill|type|pressSequentially)\\(" src --include=*.ts || true`, { encoding: "utf8" }).trim().split("\n").filter(Boolean);
   assert.ok(fills.every((l) => l.startsWith("src/sites/ExampleSite.ts")), `remplissage de champ hors du site de démonstration :\n${fills.join("\n")}`);
 });
