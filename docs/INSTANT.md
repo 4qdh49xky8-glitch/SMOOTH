@@ -86,13 +86,15 @@ Le bot ne lit ni champ de carte, ni CVV/CVC, ne remplit ni ne clique rien sur la
 
 ## Notification e-mail immédiate (optionnelle)
 
+Guide de configuration sécurisée (variables, SMTP, refus) : [EMAIL.md](EMAIL.md).
+
 Couche `src/instant/emailNotify.ts` (aucun fichier du cœur gelé modifié : le schéma standard ignore la clé, elle est lue et validée ici).
 
 ```yaml
 notifications:
   email:
     enabled: true
-    to: "vous@exemple.org"     # ou toEnv: NOM_DE_VARIABLE ; une seule adresse
+    toEnv: NOTIFICATION_EMAIL  # adresse lue dans la variable d'environnement (recommandé) ; `to:` accepté mais à éviter dans un fichier versionné
     on: "CART_SUCCESS"         # seul événement pris en charge
     provider: smtp             # smtp | api — aucun fournisseur par défaut
     from: "bot@exemple.org"

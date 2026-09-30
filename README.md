@@ -96,6 +96,7 @@ Détail : [docs/SECURITY.md](docs/SECURITY.md).
 
 | Document | Contenu |
 |----------|---------|
+| [docs/EMAIL.md](docs/EMAIL.md) | **Notification e-mail** : variables `NOTIFICATION_EMAIL`, `SMTP_USER`, `SMTP_PASS`, paramètres SMTP, refus des configurations incomplètes |
 | [docs/INSTANT.md](docs/INSTANT.md) | **INSTANT-ON-SALE** : préparation avant T0, `SaleMonitor`, critères compilés, mesures, Claude hors chemin critique |
 | [docs/SALE.md](docs/SALE.md) | **mode READY FOR SALE** : profil de vente générique, stratégies, rangées, fuseaux, `sale:check`, `sale:wait` |
 | [docs/ADAPTER_CONTRACT.md](docs/ADAPTER_CONTRACT.md) | **contrat d'adaptateur** : déclarations (authorization, allowedHosts, channel, capabilities), sept capacités, états, ApiClient, interdits |

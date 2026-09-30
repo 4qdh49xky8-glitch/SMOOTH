@@ -154,3 +154,59 @@ test("profil de vente générique config/sale.example.yaml : destinataire par to
   }
   assert.deepEqual(personal, [], "adresse personnelle dans un fichier versionné");
 });
+
+test("configuration e-mail sécurisée : destinataire = NOTIFICATION_EMAIL, identifiants SMTP = variables d'environnement seulement, aucun secret suivi par Git, configuration incomplète refusée", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { execSync } = await import("node:child_process");
+  const f = "config/sale.example.yaml";
+  const full = { NOTIFICATION_EMAIL: "dest@example.net", SMTP_USER: "user-env-only", SMTP_PASS: "Pa55-env-only-42" } as NodeJS.ProcessEnv;
+  // 1 · destinataire et identifiants viennent de l'environnement
+  const c = readEmailConfig(f, full)!;
+  assert.equal(c.to, "dest@example.net");
+  assert.deepEqual([c.smtp!.userEnv, c.smtp!.passEnv], ["SMTP_USER", "SMTP_PASS"]);
+  const yaml = readFileSync(f, "utf8").replace(/^\s*#.*$/gm, "");
+  assert.match(yaml, /toEnv:\s*NOTIFICATION_EMAIL/);
+  assert.match(yaml, /userEnv:\s*SMTP_USER/);
+  assert.match(yaml, /passEnv:\s*SMTP_PASS/);
+  for (const v of Object.values(full)) assert.ok(!yaml.includes(v!), "aucune valeur d'environnement dans le fichier");
+  // 2 · le transport utilise les valeurs de l'environnement fourni (et rien d'autre) : identifiants reçus par le FAUX serveur local
+  const smtp = await startFakeSmtp();
+  try {
+    const cfg = parseEmailConfig({ enabled: true, toEnv: "NOTIFICATION_EMAIL", on: "CART_SUCCESS", provider: "smtp", from: "bot@example.org", smtp: { host: "127.0.0.1", port: smtp.port, secure: false, userEnv: "SMTP_USER", passEnv: "SMTP_PASS" } }, full)!;
+    assert.equal(await sendBounded(createMailer(cfg, full, 3000), buildEmail(cfg, INFO, full), 5000), "SENT");
+    const creds = Buffer.from(smtp.messages[0]!.auth!.split(" ").pop()!, "base64").toString("utf8");
+    assert.ok(creds.includes("user-env-only") && creds.includes("Pa55-env-only-42"), "identifiants issus des variables d'environnement");
+    assert.ok(!smtp.messages[0]!.raw.includes("Pa55-env-only-42"), "mot de passe absent du message");
+  } finally {
+    await smtp.close();
+  }
+  // 3 · configuration incomplète → refus propre, sans valeur secrète dans le message
+  const cases: [string, NodeJS.ProcessEnv, RegExp][] = [
+    ["sans destinataire", { SMTP_USER: "u", SMTP_PASS: "p" }, /NOTIFICATION_EMAIL absente/],
+    ["sans identifiant", { NOTIFICATION_EMAIL: "dest@example.net", SMTP_PASS: "p" }, /SMTP_USER absente/],
+    ["sans mot de passe", { NOTIFICATION_EMAIL: "dest@example.net", SMTP_USER: "u" }, /SMTP_PASS absente/],
+    ["tout vide", { NOTIFICATION_EMAIL: "", SMTP_USER: "", SMTP_PASS: "" }, /absente/],
+  ];
+  for (const [name, env, re] of cases) assert.throws(() => readEmailConfig(f, env), (e: unknown) => e instanceof EmailConfigError && re.test(e.message) && !/Pa55|env-only/.test(e.message), name);
+  // 4 · aucun secret ni adresse personnelle dans les fichiers suivis par Git
+  const files = execSync("git ls-files", { encoding: "utf8" }).split("\n").filter((x) => x && !/package-lock\.json$|\.(png|jpg|ico)$/.test(x));
+  const bad: string[] = [];
+  for (const file of files) {
+    let t: string;
+    try {
+      t = readFileSync(file, "utf8");
+    } catch {
+      continue;
+    }
+    if (file === ".env.example") {
+      for (const m of t.matchAll(/^(NOTIFICATION_EMAIL|SMTP_USER|SMTP_PASS)=(.+)$/gm)) bad.push(`${file}: ${m[1]} renseignée`);
+      continue;
+    }
+    // les fichiers de test contiennent, par construction, de FAUX secrets (jeux d'essai des gardes) : seuls les fichiers non-test sont contrôlés pour les secrets
+    const isTest = /^tests\//.test(file);
+    if (!isTest) for (const m of t.matchAll(/\b(SMTP_PASS|SMTP_USER|NOTIFICATION_EMAIL)\s*[=:]\s*["']?([^\s"',}#]{3,})/g)) if (!/^(SMTP_USER|SMTP_PASS|NOTIFICATION_EMAIL|NOM_DE_VARIABLE|\.\.\.|u|p|x)$/.test(m[2]!) && !/^(u-demo|p-demo|user-env|Pa55|dest@example|autre@example|destinataire@example)/.test(m[2]!)) bad.push(`${file}: ${m[0]}`);
+    for (const m of t.matchAll(/[A-Za-z0-9._%+-]+@(?:icloud|gmail|hotmail|outlook|yahoo|live|proton(?:mail)?|me)\.(?:com|fr|me|net)\b/gi)) bad.push(`${file}: ${m[0]}`);
+    if (!isTest && /-----BEGIN [A-Z ]*PRIVATE KEY-----|\bsk-ant-[A-Za-z0-9_-]{20,}|\bghp_[A-Za-z0-9]{30,}/.test(t)) bad.push(`${file}: secret`);
+  }
+  assert.deepEqual(bad, [], "secret ou adresse personnelle dans un fichier suivi");
+});
