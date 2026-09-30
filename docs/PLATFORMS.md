@@ -144,3 +144,7 @@ le catalogue et les adaptateurs sont inchangés (toutes `NOT_VERIFIED`, aucun ad
 Non présents dans le contenu fourni, donc **inconnus** (rien n'est déduit) : année et fuseau horaire de la mise en vente, limite de billets
 par commande, conditions d'achat, identifiant de l'événement, plateforme technique de vente (le Stade de France n'est pas dans
 `platforms/catalog.json`). Une mise en vente « vendue sur une plateforme » n'est pas une autorisation d'automatiser.
+
+## pretix (instance contrôlée)
+
+Banc de test API-first : voir [PRETIX.md](PRETIX.md). **Inactif** dans le produit réel tant que les preuves et l'entrée de catalogue ne sont pas enregistrées (statut réel : NOT_VERIFIED). Ne constitue pas une autorisation d'automatiser l'achat sur les événements de tiers.
