@@ -210,3 +210,39 @@ test("configuration e-mail sécurisée : destinataire = NOTIFICATION_EMAIL, iden
   }
   assert.deepEqual(bad, [], "secret ou adresse personnelle dans un fichier suivi");
 });
+
+test("le mot de passe SMTP n'est lu qu'au moment de l'envoi, depuis l'environnement du processus ; il n'est jamais conservé ni reporté ; les tests n'utilisent que des identifiants fictifs", async () => {
+  const { readFileSync, readdirSync } = await import("node:fs");
+  const FAKE = "FICTIF-mot-de-passe-0000";
+  const reads: string[] = [];
+  const env = new Proxy({ NOTIFICATION_EMAIL: "dest@example.net", SMTP_USER: "user-fictif", SMTP_PASS: FAKE } as NodeJS.ProcessEnv, {
+    get: (t, k: string) => (reads.push(k), t[k]),
+  });
+  const smtp = await startFakeSmtp();
+  try {
+    const cfg = parseEmailConfig({ enabled: true, toEnv: "NOTIFICATION_EMAIL", on: "CART_SUCCESS", provider: "smtp", from: "bot@example.org", smtp: { host: "127.0.0.1", port: smtp.port, secure: false, userEnv: "SMTP_USER", passEnv: "SMTP_PASS" } }, env)!;
+    // la configuration ne conserve que des NOMS de variables : la valeur n'y figure pas
+    assert.ok(!JSON.stringify(cfg).includes(FAKE));
+    const msg = buildEmail(cfg, INFO, env);
+    const count = (): number => reads.filter((k) => k === "SMTP_PASS").length;
+    const beforeMailer = count();
+    const mailer = createMailer(cfg, env, 3000);
+    assert.equal(count(), beforeMailer, "créer l'expéditeur ne lit pas le mot de passe (contrôle de présence et masquage des secrets ont eu lieu avant, en mémoire seulement)");
+    const before = count();
+    assert.equal(await sendBounded(mailer, msg, 5000), "SENT");
+    assert.equal(reads.filter((k) => k === "SMTP_PASS").length, before + 1, "une lecture supplémentaire, au moment de l'envoi seulement");
+    assert.ok(!smtp.messages[0]!.raw.includes(FAKE));
+  } finally {
+    await smtp.close();
+  }
+  // aucun test ni aucun fichier de support ne lit le vrai SMTP_PASS du processus, et aucun hôte SMTP réel n'y figure
+  const files = [...readdirSync("tests").filter((f) => f.endsWith(".ts")).map((f) => `tests/${f}`), ...readdirSync("tests/helpers").map((f) => `tests/helpers/${f}`), "testkit/mockMailer.ts"];
+  for (const f of files) {
+    if (f === "tests/emailNotify.test.ts") continue;
+    const t = readFileSync(f, "utf8");
+    assert.ok(!/process\.env\.SMTP_PASS|process\.env\[["']SMTP_PASS/.test(t), `${f} lit SMTP_PASS`);
+    assert.ok(!/smtp\.mail\.me\.com|smtp\.gmail\.com|smtp-mail\.outlook\.com/.test(t), `${f} cible un fournisseur réel`);
+  }
+  const own = readFileSync("tests/emailNotify.test.ts", "utf8").replace(/^.*(?:process\.env\.SMTP_PASS|smtp\.mail\.me\.com).*$/gm, (l) => (/assert|\.test\(|\.match\(|\/\\/.test(l) ? "" : l));
+  assert.ok(!/process\.env\.SMTP_PASS/.test(own));
+});
