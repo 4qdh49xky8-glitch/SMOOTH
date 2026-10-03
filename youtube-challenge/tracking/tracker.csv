@@ -1,0 +1,5 @@
+video_id,date,type,title,hook,duration_s,cta,angle,views,impressions,ctr_pct,avg_retention_pct,likes,comments,clicks,leads,conversations,sales,revenue_usd
+# Une ligne par contenu publié. Les lignes commençant par # sont ignorées. Aucune donnée fictive : laisser vide tant que non mesuré.
+# cta: ressource | contact | outil   angle: gain_de_temps | argent | avant_apres | demo | erreur
+S1A,,short,Devis en 2 min,hookA,35,ressource,gain_de_temps,,,,,,,,,,,
+S1B,,short,Devis en 2 min,hookB,35,contact,argent,,,,,,,,,,,
