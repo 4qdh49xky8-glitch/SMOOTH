@@ -5,8 +5,9 @@ Chaîne : IA et automatisation pour freelances et petites entreprises. Revenu vi
 | Fichier | Contenu |
 |---|---|
 | `DAY1-PLAN.md` | Recherche de marché, modèles, hypothèses (corrigé lors de l'audit) |
-| `01-OFFER.md` | Offre, prix, garantie, livraison, qualification, FAQ, objections |
-| `02-FUNNEL-OUTREACH.md` | Funnel, messages de prospection, e-mails, proposition, script d'appel |
+| `06-PIVOT-SANS-VENTE.md` | **Plan actif** : affiliation + ressource gratuite, sans vente directe |
+| `01-OFFER.md` (suspendu) | Offre, prix, garantie, livraison, qualification, FAQ, objections |
+| `02-FUNNEL-OUTREACH.md` (suspendu) | Funnel, messages de prospection, e-mails, proposition, script d'appel |
 | `03-CONTENT-BATCH-1.md` | Fiches complètes : 6 Shorts + vidéo longue n°1 |
 | `05-PUBLISH-KIT.md` | Réglages chaîne, checklist de téléversement, textes prêts à copier S1-S4, réponses e-mail |
 | `04-PLAN-14-JOURS.md` | Plan jour par jour, seuils de décision, pivots |
