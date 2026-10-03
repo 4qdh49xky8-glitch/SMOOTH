@@ -5,8 +5,8 @@ Principe sans infrastructure : **pas de page externe nécessaire pour démarrer*
 ## A. Réglages de la chaîne (une fois, ~10 min)
 - **Nom** : Workflow IA
 - **Description (À propos)** :
-  « Automatiser devis, factures, relances et e-mails clients avec l'IA — démos concrètes pour freelances et petites entreprises. Les exemples sont fictifs et signalés comme tels. Contenu assisté par IA. Pack gratuit de prompts : écris à fournisseur.chine1.1@gmail.com (objet : PACK). »
-- **E-mail professionnel** (À propos → coordonnées) : fournisseur.chine1.1@gmail.com
+  « Automatiser devis, factures, relances et e-mails clients avec l'IA — démos concrètes pour freelances et petites entreprises. Les exemples sont fictifs et signalés comme tels. Contenu assisté par IA. Pack gratuit de prompts : écris à workflowia.contact@gmail.com (objet : PACK). »
+- **E-mail professionnel** (À propos → coordonnées) : workflowia.contact@gmail.com
 - **Liens de profil** (cliquables) : à ajouter dès qu'une page publique existe (voir §E). En attendant, aucun.
 - **Mots-clés de chaîne** : IA, automatisation, freelance, devis, facture, productivité.
 - **Valeurs par défaut de téléversement** : « Non, ce contenu n'est pas conçu pour les enfants » ; catégorie « Science et technologie » ; langue française.
@@ -30,11 +30,11 @@ Enregistrer l'écran (capture native du téléphone/ordinateur) pendant la démo
 - **Description** :
 ```
 Démo avec données fictives : un brief client devient un devis structuré (périmètre, exclusions, prix, conditions), puis je relis et j'ajuste. L'IA propose, c'est toi qui valides.
-Le prompt exact + 4 autres (devis, facture, relances, e-mails) : écris PACK en commentaire ou à fournisseur.chine1.1@gmail.com
+Le prompt exact + 4 autres (devis, facture, relances, e-mails) : écris PACK en commentaire ou à workflowia.contact@gmail.com
 Contenu assisté par IA.
 #IA #freelance #automatisation #productivité
 ```
-- **Commentaire épinglé** : `Écris PACK ici ou par mail à fournisseur.chine1.1@gmail.com : je t'envoie le prompt exact + 4 autres, gratuit. Dis-moi aussi : tu fais tes devis dans quel outil ?`
+- **Commentaire épinglé** : `Écris PACK ici ou par mail à workflowia.contact@gmail.com : je t'envoie le prompt exact + 4 autres, gratuit. Dis-moi aussi : tu fais tes devis dans quel outil ?`
 - **Variante de test (S1B)** : même sujet, autre exemple fictif, hook B « Tu perds 40 minutes par devis. Voilà pourquoi. », CTA contact (« je l'installe dans tes outils : écris-moi »).
 
 ### S2 — Relances de facture
@@ -42,7 +42,7 @@ Contenu assisté par IA.
 - **Description** :
 ```
 Trois messages de relance progressifs (J+3, J+10, J+20) générés avec l'IA à partir d'une facture fictive. Adapte-les à tes conditions contractuelles et à la loi de ton pays : ce n'est pas un conseil juridique.
-Les 3 modèles complets : écris PACK en commentaire ou à fournisseur.chine1.1@gmail.com
+Les 3 modèles complets : écris PACK en commentaire ou à workflowia.contact@gmail.com
 Contenu assisté par IA.
 #freelance #facturation #IA #automatisation
 ```
@@ -53,7 +53,7 @@ Contenu assisté par IA.
 - **Description** :
 ```
 Méthode en 3 étapes : trier par urgence, générer des brouillons, relire avant d'envoyer. Limite : ne jamais envoyer sans validation. Boîte mail de test fictive. Les temps affichés sont chronométrés dans la vidéo.
-Prompt n°4 du pack gratuit : écris PACK en commentaire ou à fournisseur.chine1.1@gmail.com
+Prompt n°4 du pack gratuit : écris PACK en commentaire ou à workflowia.contact@gmail.com
 Contenu assisté par IA.
 #IA #email #productivité #freelance
 ```

@@ -17,7 +17,7 @@ Chaîne : IA et automatisation pour freelances et petites entreprises. Revenu vi
 ## Actions qui nécessitent le propriétaire (placeholders à remplacer)
 - Optionnels (pas bloquants) : `{{LIEN_RESSOURCE}}` (URL publique du pack) et `{{LIEN_RESERVATION}}` ; le funnel démarre par e-mail.
 - Moyen d'encaissement : à créer à la première demande d'audit.
-- E-mail dédié : renseigné (fournisseur.chine1.1@gmail.com).
+- E-mail dédié : renseigné (workflowia.contact@gmail.com).
 - Création de la chaîne, publication, envoi des messages, encaissement.
 
 ## Conformité

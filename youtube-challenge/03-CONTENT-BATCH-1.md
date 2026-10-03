@@ -20,7 +20,7 @@ Titre / 3 variantes · Hook (0-2 s) · Script · Scènes · Texte écran · Capt
 - Capture : enregistrement d'écran de l'assistant IA, chronomètre visible.
 - CTA : « Le prompt exact : écris PACK en commentaire, ou le lien est dans mon profil. »
 - Description : voir les textes prêts à copier dans `05-PUBLISH-KIT.md` (§D).
-- Commentaire épinglé (texte, sans lien) : « Écris PACK ici ou envoie un mail à fournisseur.chine1.1@gmail.com : je t'envoie le prompt + 4 autres (gratuit). »
+- Commentaire épinglé (texte, sans lien) : « Écris PACK ici ou envoie un mail à workflowia.contact@gmail.com : je t'envoie le prompt + 4 autres (gratuit). »
 - Offre : pack gratuit → audit 59 $. Étape suivante : cliquer le lien.
 - Miniature (si utilisée) : « DEVIS 2 MIN ».
 - Test : Hook A vs B sur 2 uploads distincts (pas de doublon exact : changer l'exemple fictif).
@@ -73,8 +73,8 @@ Titre / 3 variantes · Hook (0-2 s) · Script · Scènes · Texte écran · Capt
 - **Texte à l'écran** : titres d'étapes, « EXEMPLE FICTIF », « Relis avant d'envoyer », liste de contrôle.
 - **Captures** : enregistrer l'écran (assistant IA + traitement de texte/tableur), chronomètre ouvert, zoom sur les champs critiques.
 - **CTA** : « Prends le pack de prompts gratuit (lien ci-dessous). Si tu veux qu'on l'installe dans tes outils : mini-audit 59 $. »
-- **Description** : résumé + chapitres horodatés + « Pack gratuit : écris PACK à fournisseur.chine1.1@gmail.com » (+ lien public du pack dès qu'il existe) + « Exemples fictifs. Contenu assisté par IA. Contient peut-être des liens affiliés. » + hashtags #IA #freelance #automatisation.
-- **Commentaire épinglé** : « Pack gratuit : écris PACK ici ou à fournisseur.chine1.1@gmail.com — dis-moi dans quel outil tu fais tes devis, je te réponds. »
+- **Description** : résumé + chapitres horodatés + « Pack gratuit : écris PACK à workflowia.contact@gmail.com » (+ lien public du pack dès qu'il existe) + « Exemples fictifs. Contenu assisté par IA. Contient peut-être des liens affiliés. » + hashtags #IA #freelance #automatisation.
+- **Commentaire épinglé** : « Pack gratuit : écris PACK ici ou à workflowia.contact@gmail.com — dis-moi dans quel outil tu fais tes devis, je te réponds. »
 - **Miniature** : « DEVIS → FACTURE → RELANCE » (3 mots visibles max), flèches, contraste fort ; mention de preuve absente (aucun faux chiffre).
 - **Offre associée** : pack gratuit → audit 59 $ → pack 290 $. **Étape suivante** : clic description.
 - **Pourquoi la regarder ?** workflow réutilisable. **Action suivante ?** télécharger le pack. **Pourquoi maintenant ?** chaque jour de retard coûte de la trésorerie.
