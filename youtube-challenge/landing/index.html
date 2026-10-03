@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin en pilote automatique</title>
+<style>
+  :root { --bg:#fff; --fg:#1a1a1a; --muted:#555; --accent:#0b5fff; --card:#f5f7fb; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#12151a; --fg:#eee; --muted:#aaa; --accent:#6ea0ff; --card:#1b2028; } }
+  body { margin:0; background:var(--bg); color:var(--fg); font:17px/1.55 system-ui, sans-serif; }
+  main { max-width:680px; margin:0 auto; padding:32px 16px 64px; }
+  h1 { font-size:2rem; line-height:1.2; }
+  .card { background:var(--card); border-radius:12px; padding:16px 20px; margin:16px 0; }
+  a.btn { display:inline-block; background:var(--accent); color:#fff; padding:12px 20px; border-radius:8px; text-decoration:none; font-weight:600; margin:4px 8px 4px 0; }
+  a.alt { background:transparent; color:var(--accent); border:2px solid var(--accent); }
+  small, .muted { color:var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Moins d'administratif, plus de temps pour vos clients.</h1>
+  <p>J'aide les freelances et petites entreprises à automatiser devis, factures, relances et e-mails clients avec l'IA, sans changer leurs outils.</p>
+  <p><a class="btn" href="{{LIEN_RESSOURCE}}">Pack gratuit de prompts</a> <a class="btn alt" href="{{LIEN_RESERVATION}}">Réserver un mini-audit (59 $)</a></p>
+
+  <div class="card">
+    <h2>Mini-audit — 59 $</h2>
+    <p>30 minutes, un plan écrit avec les 3 tâches les plus rentables à automatiser et un modèle prêt à l'emploi, sous 48 h. Remboursé si le plan ne contient pas 3 automatisations concrètes.</p>
+  </div>
+  <div class="card">
+    <h2>Pack « Admin auto » installé — 290 $</h2>
+    <p>Devis, facture et relances automatisés dans vos outils, 3 modèles personnalisés, prise en main de 30 min et 7 jours de support. Correction gratuite ou remboursement si le système ne fonctionne pas sur 3 cas réels.</p>
+  </div>
+  <div class="card">
+    <h2>Transparence</h2>
+    <p>Le travail est assisté par des outils d'IA et relu par un humain. Aucune promesse de gain chiffré. Les démonstrations utilisent des données fictives, signalées comme telles. Pas encore de témoignages : je ne publie que ceux que des clients m'autorisent à publier.</p>
+  </div>
+  <p class="muted">Contact : workflowia.contact@gmail.com — <small>Les prompts du pack ne constituent pas un conseil juridique ou comptable.</small></p>
+</main>
+</body>
+</html>
