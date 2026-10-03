@@ -8,15 +8,16 @@ Chaîne : IA et automatisation pour freelances et petites entreprises. Revenu vi
 | `01-OFFER.md` | Offre, prix, garantie, livraison, qualification, FAQ, objections |
 | `02-FUNNEL-OUTREACH.md` | Funnel, messages de prospection, e-mails, proposition, script d'appel |
 | `03-CONTENT-BATCH-1.md` | Fiches complètes : 6 Shorts + vidéo longue n°1 |
+| `05-PUBLISH-KIT.md` | Réglages chaîne, checklist de téléversement, textes prêts à copier S1-S4, réponses e-mail |
 | `04-PLAN-14-JOURS.md` | Plan jour par jour, seuils de décision, pivots |
 | `resources/PACK-PROMPTS-ADMIN.md` | Lead magnet gratuit |
 | `landing/index.html` | Page de présentation |
 | `tracking/` | `tracker.csv` + `node tracking/report.mjs` (KPI, winners, écart vs 500 $) |
 
 ## Actions qui nécessitent le propriétaire (placeholders à remplacer)
-- `{{LIEN_RESSOURCE}}` : URL publique du pack gratuit.
-- `{{LIEN_RESERVATION}}` : page de réservation/paiement (outil gratuit à créer).
-- `{{EMAIL_DEDIE}}` : e-mail dédié au projet (pas l'e-mail personnel).
+- Optionnels (pas bloquants) : `{{LIEN_RESSOURCE}}` (URL publique du pack) et `{{LIEN_RESERVATION}}` ; le funnel démarre par e-mail.
+- Moyen d'encaissement : à créer à la première demande d'audit.
+- E-mail dédié : renseigné (fournisseur.chine1.1@gmail.com).
 - Création de la chaîne, publication, envoi des messages, encaissement.
 
 ## Conformité

@@ -4,7 +4,7 @@ Règles communes
 - Toutes les démos utilisent des **données fictives**, signalées à l'écran : « Exemple fictif ».
 - YouTube Studio : cocher « contenu modifié ou synthétique » si voix/images IA réalistes.
 - Variété : chaque Short a un script et des captures différents (éviter les gabarits identiques, cf. politique « inauthentic content »).
-- Liens : `{{LIEN_RESSOURCE}}` (pack gratuit), `{{LIEN_RESERVATION}}` (audit). Lien en description + commentaire épinglé.
+- **Liens dans les Shorts : non cliquables** (descriptions et commentaires de Shorts, vérifié via sources tierces). Les Shorts renvoient donc vers : le **profil de la chaîne** (liens + e-mail pro dans « À propos »), la vidéo longue (lien vidéo associé) ou « écris PACK en commentaire / par e-mail ». Les vraies URLs cliquables vont dans la description des **vidéos longues** et les liens de profil.
 - Hashtags de base : #IA #freelance #automatisation #productivité (3-4 max).
 - Métriques communes : vues, rétention moyenne, % swipe-away (Shorts), likes, commentaires, clics lien, leads, ventes, revenu.
 
@@ -18,9 +18,9 @@ Titre / 3 variantes · Hook (0-2 s) · Script · Scènes · Texte écran · Capt
 - Scènes : 1) plan sur le brief 2) prompt collé 3) devis généré, zoom sur « exclusions » 4) correction manuelle 5) écran final.
 - Texte écran : « EXEMPLE FICTIF » · « 40 min → 2 min » (chiffres seulement si chronométrés pour de vrai pendant le tournage) · « Relis toujours ».
 - Capture : enregistrement d'écran de l'assistant IA, chronomètre visible.
-- CTA : « Le prompt exact est dans le commentaire épinglé. »
+- CTA : « Le prompt exact : écris PACK en commentaire, ou le lien est dans mon profil. »
 - Description : « Démo avec données fictives. Pack gratuit de prompts (devis, factures, relances) : {{LIEN_RESSOURCE}} » + hashtags.
-- Commentaire épinglé : « Voici le prompt + 4 autres : {{LIEN_RESSOURCE}} »
+- Commentaire épinglé (texte, sans lien) : « Écris PACK ici ou envoie un mail à fournisseur.chine1.1@gmail.com : je t'envoie le prompt + 4 autres (gratuit). »
 - Offre : pack gratuit → audit 59 $. Étape suivante : cliquer le lien.
 - Miniature (si utilisée) : « DEVIS 2 MIN ».
 - Test : Hook A vs B sur 2 uploads distincts (pas de doublon exact : changer l'exemple fictif).
@@ -31,7 +31,7 @@ Titre / 3 variantes · Hook (0-2 s) · Script · Scènes · Texte écran · Capt
 - Script : 0-2 hook · 2-12 contexte facture fictive · 12-28 les 3 relances (J+3, J+10, J+20) en bref · 28-35 avertissement (adapter au droit local) + CTA.
 - Texte écran : « EXEMPLE FICTIF » · J+3 / J+10 / J+20 · « Vérifie tes conditions contractuelles ».
 - Capture : e-mails générés côte à côte.
-- CTA : « Les 3 modèles complets : lien en commentaire épinglé. »
+- CTA : « Les 3 modèles complets : lien dans mon profil. »
 - Commentaire épinglé : pack gratuit. Offre : relances automatisées dans le pack 290 $.
 - Test : CTA ressource vs CTA contact (« je l'installe dans ton Gmail : lien en description »).
 

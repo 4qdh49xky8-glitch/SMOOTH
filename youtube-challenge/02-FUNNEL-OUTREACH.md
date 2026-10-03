@@ -11,14 +11,14 @@ Prospection directe (manuelle, ciblée) ──┘   ← chemin le plus rapide ve
 Règles : messages individualisés, pas de spam ni d'envoi de masse, pas de scraping d'e-mails, respecter les règles de chaque plateforme (pas d'automatisation de DM), et toujours proposer une sortie (« pas intéressé ? aucun souci »). Prospection **envoyée par le propriétaire** depuis un compte dédié (je prépare, il envoie).
 
 ## Landing page
-`landing/index.html` — une page statique. Placeholders à remplir : `{{LIEN_RESERVATION}}`, `{{LIEN_RESSOURCE}}`, `{{EMAIL_DEDIE}}`.
+`landing/index.html` — page statique optionnelle (non hébergée pour l'instant ; le funnel démarre par e-mail, voir `05-PUBLISH-KIT.md`). Placeholders restants dans la page : `{{LIEN_RESERVATION}}`, `{{LIEN_RESSOURCE}}`.
 
 ## Messages de prospection (à personnaliser, ≤ 70 mots)
 **M1 — après un post où la personne se plaint de relances/devis**
-> Bonjour [Prénom], j'ai vu votre message sur [sujet précis]. Je prépare des démos courtes sur l'automatisation des devis/relances avec l'IA (données fictives). Si ça vous parle, je vous envoie gratuitement un pack de modèles à adapter : {{LIEN_RESSOURCE}}. Aucun engagement, et pas de souci si ce n'est pas le bon moment.
+> Bonjour [Prénom], j'ai vu votre message sur [sujet précis]. Je prépare des démos courtes sur l'automatisation des devis/relances avec l'IA (données fictives). Si ça vous parle, répondez « PACK » et je vous envoie gratuitement un pack de modèles à adapter. Aucun engagement, et pas de souci si ce n'est pas le bon moment.
 
 **M2 — relance J+4 (une seule)**
-> Re-bonjour [Prénom], juste pour vérifier que le pack vous est utile. Si vous voulez qu'on regarde ensemble votre cas (30 min, 59 $, plan écrit), voici la réservation : {{LIEN_RESERVATION}}. Sinon, bonne continuation !
+> Re-bonjour [Prénom], juste pour vérifier que le pack vous est utile. Si vous voulez qu'on regarde ensemble votre cas (30 min, 59 $, plan écrit), répondez « AUDIT » et je vous envoie le questionnaire et le moyen de paiement. Sinon, bonne continuation !
 
 **M3 — réponse à un lead chaud**
 > Merci pour votre retour ! Pour être utile : quelle tâche vous coûte le plus de temps (devis, factures, relances, e-mails) et combien d'heures par semaine ? Je vous dis honnêtement si je peux vous aider.
